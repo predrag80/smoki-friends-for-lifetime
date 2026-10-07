@@ -20,11 +20,13 @@ dev/              lokalni servisi (docker compose) i Caddy konfiguracija
 
 ## Lokalno pokretanje
 
-1. Lokalni domeni (jednom):
+1. Lokalni domeni (jednom). Na macOS-u je to fajl `/etc/hosts` (link na `/private/etc/hosts`):
 
    ```sh
    echo "127.0.0.1 app.smoki.local api.smoki.local" | sudo tee -a /etc/hosts
    ```
+
+   Ili ručno: `sudo nano /etc/hosts`, dodaj liniju, sačuvaj (Ctrl+O, Enter, Ctrl+X).
 
 2. Zavisnosti i env fajlovi:
 
@@ -46,16 +48,23 @@ dev/              lokalni servisi (docker compose) i Caddy konfiguracija
    npm run prisma:generate -w @sffl/backend
    ```
 
-5. Dev serveri, svaki u svom terminalu:
+5. Dev serveri (frontend, API i worker zajedno, u jednom terminalu):
 
    ```sh
-   npm run dev:backend
-   npm run dev:worker
-   npm run dev:frontend
+   npm run dev
    ```
+
+   Pojedinačno: `npm run dev:frontend`, `npm run dev:backend`, `npm run dev:worker`.
 
 Aplikacija: http://app.smoki.local · API health: http://api.smoki.local/health ·
 MinIO konzola: http://localhost:9001 (sffl / sffl-secret)
+
+## Produkcioni režim lokalno
+
+```sh
+npm run build
+npm start
+```
 
 ## Provere
 

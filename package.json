@@ -12,6 +12,8 @@
   ],
   "scripts": {
     "postinstall": "npm run build -w @sffl/shared",
+    "dev": "npm run build -w @sffl/shared && concurrently -k -n web,api,worker -c cyan,green,magenta \"npm:dev:frontend\" \"npm:dev:backend\" \"npm:dev:worker\"",
+    "start": "concurrently -k -n web,api,worker -c cyan,green,magenta \"npm run start -w @sffl/frontend\" \"npm run start -w @sffl/backend\" \"npm run start:worker -w @sffl/backend\"",
     "dev:services": "docker compose -f dev/docker-compose.dev.yml up -d",
     "dev:services:down": "docker compose -f dev/docker-compose.dev.yml down",
     "dev:frontend": "npm run dev -w @sffl/frontend",
@@ -21,5 +23,8 @@
     "lint": "npm run lint -w @sffl/shared && npm run lint -w @sffl/frontend && npm run lint -w @sffl/backend",
     "typecheck": "npm run build -w @sffl/shared && npm run typecheck -w @sffl/shared && npm run typecheck -w @sffl/frontend && npm run typecheck -w @sffl/backend",
     "test": "npm run test -w @sffl/frontend && npm run test -w @sffl/backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.4"
   }
 }
