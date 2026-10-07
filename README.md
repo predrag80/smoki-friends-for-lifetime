@@ -68,6 +68,9 @@ dev/              lokalni servisi (docker compose) i Caddy konfiguracija
 Aplikacija: http://app.smoki.local · API health: http://api.smoki.local/health ·
 Storage konzola (RustFS): http://localhost:9001 (SFFLDEVACCESSKEY / sffl-dev-secret-key)
 
+Portovi su namerno drugačiji od Smoki projekta, pa oba mogu da rade istovremeno:
+frontend 3100, API 4100, worker health 4101, Postgres 5433, Valkey 6380, storage 9000/9001.
+
 ## Produkcioni režim lokalno
 
 ```sh

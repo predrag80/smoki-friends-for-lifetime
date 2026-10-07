@@ -4,10 +4,10 @@
 
 # Next.js dev server on the host
 http://app.smoki.local {
-	reverse_proxy host.docker.internal:3000
+	reverse_proxy host.docker.internal:3100
 }
 
 # Fastify API on the host
 http://api.smoki.local {
-	reverse_proxy host.docker.internal:4000
+	reverse_proxy host.docker.internal:4100
 }

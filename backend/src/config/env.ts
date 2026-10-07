@@ -17,8 +17,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PROCESS_ROLE: z.enum(["api", "worker", "all"]).default("api"),
   HOST: z.string().default("0.0.0.0"),
-  PORT: z.coerce.number().int().positive().default(4000),
-  WORKER_HEALTH_PORT: z.coerce.number().int().positive().default(4001),
+  PORT: z.coerce.number().int().positive().default(4100),
+  WORKER_HEALTH_PORT: z.coerce.number().int().positive().default(4101),
 
   APP_URL: z.string().url().default("http://app.smoki.local"),
   API_URL: z.string().url().default("http://api.smoki.local"),
