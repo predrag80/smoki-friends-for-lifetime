@@ -45,8 +45,9 @@ an automatically edited final "Friend for a Lifetime" film.
 - Users can delete their account and all photos/generated media.
 
 ## Local Development
-- Domains: `app.smoki.local` (Next.js :3000) and `api.smoki.local` (Fastify :4000) through Caddy.
-- Services: `npm run dev:services` (Postgres, Valkey, RustFS, Caddy).
+- Domains: `app.smoki.local` (Next.js :3000) and `api.smoki.local` (Fastify :4000) through the local nginx
+  (`dev/nginx/smoki.local.conf`); Caddy is an optional compose profile (`proxy`).
+- Services: `npm run dev:services` (Postgres, Valkey, RustFS).
 - Do not run `npm run build` while dev servers are running; use dev servers for iteration.
 
 ## Delivery Phases

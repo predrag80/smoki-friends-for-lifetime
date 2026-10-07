@@ -16,7 +16,7 @@ dev/              lokalni servisi (docker compose) i Caddy konfiguracija
 
 - Node.js 22 (`nvm use`)
 - OrbStack (Docker engine + `docker compose`)
-- Slobodni portovi 80, 5432, 6379, 9000 i 9001. Ako DDEV zauzima port 80, pokreni `ddev poweroff`.
+- Lokalni nginx na portu 80 (Homebrew) i slobodni portovi 5432, 6379, 9000 i 9001
 
 ## Lokalno pokretanje
 
@@ -36,19 +36,28 @@ dev/              lokalni servisi (docker compose) i Caddy konfiguracija
    cp frontend/.env.example frontend/.env.local
    ```
 
-3. Servisi (Postgres, Valkey, RustFS storage, Caddy):
+3. Lokalni nginx za domene (jednom). Homebrew nginx već drži port 80, pa on rutira domene:
+
+   ```sh
+   cp dev/nginx/smoki.local.conf "$(brew --prefix)/etc/nginx/servers/"
+   sudo nginx -t && sudo nginx -s reload
+   ```
+
+   Bez lokalnog nginx-a koristi Caddy: `docker compose -f dev/docker-compose.dev.yml --profile proxy up -d`.
+
+4. Servisi (Postgres, Valkey, RustFS storage):
 
    ```sh
    npm run dev:services
    ```
 
-4. Prisma klijent:
+5. Prisma klijent:
 
    ```sh
    npm run prisma:generate -w @sffl/backend
    ```
 
-5. Dev serveri (frontend, API i worker zajedno, u jednom terminalu):
+6. Dev serveri (frontend, API i worker zajedno, u jednom terminalu):
 
    ```sh
    npm run dev

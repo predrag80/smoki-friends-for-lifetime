@@ -1,6 +1,7 @@
 # Local development services. Run from the repo root: npm run dev:services
-# Next.js and Fastify run on the host (npm run dev:frontend / dev:backend);
-# Caddy routes app.smoki.local and api.smoki.local to them.
+# Next.js and Fastify run on the host (npm run dev). app.smoki.local and
+# api.smoki.local are routed by the local nginx (dev/nginx/smoki.local.conf),
+# or by the optional Caddy service (profile "proxy").
 name: sffl-dev
 
 services:
@@ -77,7 +78,10 @@ services:
           || aws --endpoint-url http://storage:9000 s3api create-bucket --bucket sffl-private
     restart: "no"
 
+  # Optional: only for machines without a local web server on port 80.
+  # Start with: docker compose -f dev/docker-compose.dev.yml --profile proxy up -d
   caddy:
+    profiles: ["proxy"]
     image: caddy:2-alpine
     restart: unless-stopped
     ports:
