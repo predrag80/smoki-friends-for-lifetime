@@ -63,6 +63,13 @@ an automatically edited final "Friend for a Lifetime" film.
 - Do not run `npm run build` while dev servers are running; use dev servers for iteration.
 - Git commits carry no AI attribution lines.
 
+## Workflow (project skills in `.claude/skills/`)
+- `implement-feature`: plan first, get the user's approval, then implement, document, verify and commit.
+- `add-api-endpoint`: Fastify module layout, zod validation, error codes, service tests.
+- `db-change`: Prisma schema changes, migrations (run on the user's Mac), idempotent seed.
+- `verify`: lint, typecheck, test and build before every commit.
+- `commit`: conventional commits in English, no AI attribution, no secrets.
+
 ## Delivery Phases
 1. Foundation setup — monorepo, skeletons, local environment, CI. (done)
 2. Domain + data — Prisma models: User, Consent, MediaAsset, Scene, SceneTranslation, Moment,
