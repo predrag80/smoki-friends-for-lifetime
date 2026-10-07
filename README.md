@@ -16,7 +16,7 @@ dev/              lokalni servisi (docker compose) i Caddy konfiguracija
 
 - Node.js 22 (`nvm use`)
 - OrbStack (Docker engine + `docker compose`)
-- Lokalni nginx na portu 80 (Homebrew) i slobodni portovi 5432, 6379, 9000 i 9001
+- Lokalni nginx na portu 80 (Homebrew) i slobodni portovi 5433 (Postgres), 6380 (Valkey), 9000 i 9001 (storage)
 
 ## Lokalno pokretanje
 

@@ -13,7 +13,8 @@ services:
       POSTGRES_USER: sffl
       POSTGRES_PASSWORD: sffl
     ports:
-      - "5432:5432"
+      # 5433 on the host so it never collides with a locally installed Postgres
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -26,7 +27,8 @@ services:
     image: valkey/valkey:8-alpine
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      # 6380 on the host so it never collides with a locally installed Redis
+      - "6380:6379"
     volumes:
       - valkey_data:/data
 
