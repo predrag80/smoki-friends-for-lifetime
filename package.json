@@ -1,0 +1,25 @@
+{
+  "name": "smoki-friends-for-lifetime",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "frontend",
+    "backend",
+    "packages/*"
+  ],
+  "scripts": {
+    "postinstall": "npm run build -w @sffl/shared",
+    "dev:services": "docker compose -f dev/docker-compose.dev.yml up -d",
+    "dev:services:down": "docker compose -f dev/docker-compose.dev.yml down",
+    "dev:frontend": "npm run dev -w @sffl/frontend",
+    "dev:backend": "npm run dev -w @sffl/backend",
+    "dev:worker": "npm run dev:worker -w @sffl/backend",
+    "build": "npm run build -w @sffl/shared && npm run build -w @sffl/frontend && npm run build -w @sffl/backend",
+    "lint": "npm run lint -w @sffl/shared && npm run lint -w @sffl/frontend && npm run lint -w @sffl/backend",
+    "typecheck": "npm run build -w @sffl/shared && npm run typecheck -w @sffl/shared && npm run typecheck -w @sffl/frontend && npm run typecheck -w @sffl/backend",
+    "test": "npm run test -w @sffl/frontend && npm run test -w @sffl/backend"
+  }
+}
