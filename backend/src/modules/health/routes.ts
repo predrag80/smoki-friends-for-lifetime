@@ -5,7 +5,7 @@ import { getRedisClient } from "../../lib/redis.js";
 import { getHealth } from "./service.js";
 
 export async function healthRoutes(app: FastifyInstance) {
-  app.get("/health", async (_request, reply) => {
+  app.get("/health", async (request, reply) => {
     const redis = getRedisClient();
     const health = await getHealth({
       service: "api",
@@ -17,7 +17,10 @@ export async function healthRoutes(app: FastifyInstance) {
             if (redis.status === "wait") await redis.connect();
             await redis.ping();
           }
-        : null
+        : null,
+      onCheckError: (check, error) => {
+        request.log.warn({ check, err: error }, "Health check failed");
+      }
     });
 
     return reply.code(health.status === "ok" ? 200 : 503).send(health);

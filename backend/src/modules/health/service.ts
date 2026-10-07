@@ -7,21 +7,27 @@ export type HealthDependencies = {
   checkDatabase: HealthCheck;
   checkRedis: HealthCheck | null;
   now?: () => Date;
+  onCheckError?: (check: "database" | "redis", error: unknown) => void;
 };
 
-async function runCheck(check: HealthCheck): Promise<"ok" | "error"> {
+async function runCheck(
+  name: "database" | "redis",
+  check: HealthCheck,
+  onError?: HealthDependencies["onCheckError"]
+): Promise<"ok" | "error"> {
   try {
     await check();
     return "ok";
-  } catch {
+  } catch (error) {
+    onError?.(name, error);
     return "error";
   }
 }
 
 export async function getHealth(deps: HealthDependencies): Promise<HealthResponse> {
   const [database, redis] = await Promise.all([
-    runCheck(deps.checkDatabase),
-    deps.checkRedis ? runCheck(deps.checkRedis) : Promise.resolve("disabled" as const)
+    runCheck("database", deps.checkDatabase, deps.onCheckError),
+    deps.checkRedis ? runCheck("redis", deps.checkRedis, deps.onCheckError) : Promise.resolve("disabled" as const)
   ]);
 
   return {
