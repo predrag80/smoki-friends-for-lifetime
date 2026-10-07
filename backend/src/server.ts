@@ -6,6 +6,7 @@ import { getEnv } from "./config/env.js";
 import { prisma } from "./lib/prisma.js";
 import { closeRedisClient, getRedisClient } from "./lib/redis.js";
 import { healthRoutes } from "./modules/health/routes.js";
+import { sceneRoutes } from "./modules/scenes/routes.js";
 
 function parseCorsOrigins(value?: string): Set<string> {
   return new Set(
@@ -44,6 +45,7 @@ export async function buildServer() {
   });
 
   await app.register(healthRoutes);
+  await app.register(sceneRoutes);
 
   app.addHook("onClose", async () => {
     await prisma.$disconnect();

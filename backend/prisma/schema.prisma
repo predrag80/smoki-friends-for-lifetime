@@ -7,5 +7,281 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Domain models (User, Consent, SourcePhoto, Scene, Moment, GenerationJob,
-// FinalFilm, ShareLink) are introduced in the next phase.
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum MarketCode {
+  SRB
+  BIH
+  HRV
+  MKD
+  AUT
+}
+
+enum AppLocale {
+  sr
+  bs
+  hr
+  mk
+  de
+}
+
+/// JUČE / DANAS / JEDNOG DANA
+enum LifePeriod {
+  YESTERDAY
+  TODAY
+  SOMEDAY
+}
+
+enum Territory {
+  RELAXING
+  SOCIALIZING
+  SPORT_CHEERING
+}
+
+enum ConsentType {
+  TERMS
+  PRIVACY
+  PHOTO_PROCESSING
+  MARKETING
+}
+
+enum MediaKind {
+  SOURCE_PHOTO
+  GENERATED_PHOTO
+  GENERATED_VIDEO
+  FINAL_FILM
+}
+
+enum MomentStatus {
+  PHOTO_PENDING
+  PHOTO_READY
+  VIDEO_PENDING
+  VIDEO_READY
+  FAILED
+}
+
+enum GenerationJobType {
+  PHOTO
+  VIDEO
+  FINAL_FILM
+}
+
+enum GenerationJobStatus {
+  QUEUED
+  IN_PROGRESS
+  SUCCEEDED
+  FAILED
+  CANCELED
+}
+
+enum FinalFilmStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+// ---------------------------------------------------------------------------
+// Users and consent
+// ---------------------------------------------------------------------------
+
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  /// Only the birth year is stored (data minimisation); current age is derived from it.
+  birthYear Int
+  market    MarketCode
+  locale    AppLocale  @default(sr)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  /// Set when the user requests deletion; media and personal data are purged by a worker.
+  deletedAt DateTime?
+
+  consents       Consent[]
+  mediaAssets    MediaAsset[]
+  moments        Moment[]
+  generationJobs GenerationJob[]
+  finalFilm      FinalFilm?
+  shareLinks     ShareLink[]
+}
+
+model Consent {
+  id        String      @id @default(cuid())
+  userId    String
+  type      ConsentType
+  /// Version of the legal text the user accepted (client-owned documents).
+  version   String
+  grantedAt DateTime    @default(now())
+  revokedAt DateTime?
+  ipAddress String?
+  userAgent String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+}
+
+// ---------------------------------------------------------------------------
+// Files in private object storage
+// ---------------------------------------------------------------------------
+
+model MediaAsset {
+  id          String    @id @default(cuid())
+  userId      String
+  kind        MediaKind
+  /// Object key in the private bucket. Never exposed directly; served via signed URLs.
+  storageKey  String    @unique
+  contentType String
+  byteSize    Int?
+  width       Int?
+  height      Int?
+  durationMs  Int?
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sourceForMoments Moment[]        @relation("MomentSourcePhoto")
+  photoForMoment   Moment?         @relation("MomentPhoto")
+  videoForMoment   Moment?         @relation("MomentVideo")
+  finalFilm        FinalFilm?
+  jobInputs        GenerationJob[] @relation("JobInput")
+  jobOutputs       GenerationJob[] @relation("JobOutput")
+
+  @@index([userId, kind])
+}
+
+// ---------------------------------------------------------------------------
+// Scene catalog (seeded from @sffl/shared sceneCatalog)
+// ---------------------------------------------------------------------------
+
+model Scene {
+  /// Stable slug, e.g. "movie-night-couch".
+  id        String    @id
+  territory Territory
+  sortOrder Int
+  minAge    Int
+  maxAge    Int
+  isActive  Boolean   @default(true)
+  /// Internal AI prompt template; filled in the generation phase.
+  aiPrompt  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  translations SceneTranslation[]
+  moments      Moment[]
+
+  @@index([territory, sortOrder])
+}
+
+model SceneTranslation {
+  sceneId     String
+  locale      AppLocale
+  title       String
+  description String
+
+  scene Scene @relation(fields: [sceneId], references: [id], onDelete: Cascade)
+
+  @@id([sceneId, locale])
+}
+
+// ---------------------------------------------------------------------------
+// User story: moments, generation jobs, final film, sharing
+// ---------------------------------------------------------------------------
+
+/// One personalised moment per life period: photo first, then a short video from that photo.
+model Moment {
+  id            String       @id @default(cuid())
+  userId        String
+  period        LifePeriod
+  targetAge     Int
+  sceneId       String
+  sourcePhotoId String
+  photoAssetId  String?      @unique
+  videoAssetId  String?      @unique
+  status        MomentStatus @default(PHOTO_PENDING)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scene       Scene           @relation(fields: [sceneId], references: [id])
+  sourcePhoto MediaAsset      @relation("MomentSourcePhoto", fields: [sourcePhotoId], references: [id])
+  photoAsset  MediaAsset?     @relation("MomentPhoto", fields: [photoAssetId], references: [id])
+  videoAsset  MediaAsset?     @relation("MomentVideo", fields: [videoAssetId], references: [id])
+  jobs        GenerationJob[]
+  shareLinks  ShareLink[]
+
+  @@unique([userId, period])
+}
+
+/// Async work item processed by the worker. Also the source for daily limits and cost analytics.
+model GenerationJob {
+  id            String              @id @default(cuid())
+  userId        String
+  type          GenerationJobType
+  status        GenerationJobStatus @default(QUEUED)
+  momentId      String?
+  finalFilmId   String?
+  inputAssetId  String?
+  outputAssetId String?
+  attempts      Int                 @default(0)
+  maxAttempts   Int                 @default(3)
+  /// Earliest time the worker may (re)try this job.
+  runAfter      DateTime            @default(now())
+  lockedBy      String?
+  lockedAt      DateTime?
+  provider      String?
+  providerJobId String?
+  errorCode     String?
+  errorMessage  String?
+  /// Provider cost in micro-USD (1 USD = 1_000_000).
+  costMicroUsd  Int?
+  createdAt     DateTime            @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moment      Moment?     @relation(fields: [momentId], references: [id], onDelete: SetNull)
+  finalFilm   FinalFilm?  @relation(fields: [finalFilmId], references: [id], onDelete: SetNull)
+  inputAsset  MediaAsset? @relation("JobInput", fields: [inputAssetId], references: [id])
+  outputAsset MediaAsset? @relation("JobOutput", fields: [outputAssetId], references: [id])
+
+  @@index([status, runAfter])
+  @@index([userId, type, createdAt])
+  @@index([momentId])
+}
+
+/// Automatic montage of the three moment videos (JUČE → DANAS → JEDNOG DANA).
+model FinalFilm {
+  id           String          @id @default(cuid())
+  userId       String          @unique
+  status       FinalFilmStatus @default(PENDING)
+  videoAssetId String?         @unique
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  videoAsset MediaAsset?     @relation(fields: [videoAssetId], references: [id])
+  jobs       GenerationJob[]
+  shareLinks ShareLink[]
+}
+
+/// Public link a friend opens; leads to the landing page where they create their own version.
+model ShareLink {
+  id          String    @id @default(cuid())
+  /// Unguessable public token used in the URL.
+  token       String    @unique
+  userId      String
+  momentId    String?
+  finalFilmId String?
+  viewCount   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moment    Moment?    @relation(fields: [momentId], references: [id], onDelete: Cascade)
+  finalFilm FinalFilm? @relation(fields: [finalFilmId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}

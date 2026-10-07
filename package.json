@@ -22,7 +22,7 @@
     "build": "npm run build -w @sffl/shared && npm run build -w @sffl/frontend && npm run build -w @sffl/backend",
     "lint": "npm run lint -w @sffl/shared && npm run lint -w @sffl/frontend && npm run lint -w @sffl/backend",
     "typecheck": "npm run build -w @sffl/shared && npm run typecheck -w @sffl/shared && npm run typecheck -w @sffl/frontend && npm run typecheck -w @sffl/backend",
-    "test": "npm run test -w @sffl/frontend && npm run test -w @sffl/backend"
+    "test": "npm run test -w @sffl/shared && npm run test -w @sffl/frontend && npm run test -w @sffl/backend"
   },
   "devDependencies": {
     "concurrently": "^9.2.4"

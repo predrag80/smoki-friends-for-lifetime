@@ -51,10 +51,11 @@ dev/              lokalni servisi (docker compose) i Caddy konfiguracija
    npm run dev:services
    ```
 
-5. Prisma klijent:
+5. Baza: migracije i seed scena:
 
    ```sh
-   npm run prisma:generate -w @sffl/backend
+   npm run prisma:migrate:dev -w @sffl/backend
+   npm run db:seed -w @sffl/backend
    ```
 
 6. Dev serveri (frontend, API i worker zajedno, u jednom terminalu):
@@ -66,6 +67,7 @@ dev/              lokalni servisi (docker compose) i Caddy konfiguracija
    Pojedinačno: `npm run dev:frontend`, `npm run dev:backend`, `npm run dev:worker`.
 
 Aplikacija: http://app.smoki.local · API health: http://api.smoki.local/health ·
+Scene: http://api.smoki.local/scenes?period=YESTERDAY&age=12&currentAge=36 ·
 Storage konzola (RustFS): http://localhost:9001 (SFFLDEVACCESSKEY / sffl-dev-secret-key)
 
 Portovi su namerno drugačiji od Smoki projekta, pa oba mogu da rade istovremeno:

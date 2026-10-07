@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+export * from "./domain/life-periods.js";
+export * from "./domain/scenes.js";
+
 /** Markets covered by the campaign. Country is stored independently of UI language. */
 export const marketCodes = ["SRB", "BIH", "HRV", "MKD", "AUT"] as const;
 export type MarketCode = (typeof marketCodes)[number];

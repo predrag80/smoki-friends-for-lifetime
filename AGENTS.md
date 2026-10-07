@@ -42,6 +42,16 @@ an automatically edited final "Friend for a Lifetime" film.
 - Scenes are data: 15 scenes for v1, each with territory and allowed life periods/age ranges.
   The UI only offers scenes valid for the selected age (e.g. "Ekipa ispred škole" not offered at 65).
 - Generation limits (attempts per user/day, retries) are configuration, not code.
+- Domain rules live in `packages/shared/src/domain` and are used by both frontend and backend:
+  - Life period age ranges (agreed 2026-10-07): YESTERDAY 6..(current-5), TODAY = current,
+    SOMEDAY (current+10)..85. A period is unavailable if its range would be empty.
+  - Scene catalog v1 (15 scenes) with per-scene min/max age; the DB is seeded from it
+    (`npm run db:seed -w @sffl/backend`).
+- Only the birth year is stored (not full date of birth); current age is derived from it.
+- Every stored file is a `MediaAsset` row pointing to a private storage key (source photo,
+  generated photo, video, final film). One `Moment` per user per life period.
+- `GenerationJob` is the queue table (status + runAfter + lock) and the source for limits/cost analytics.
+- Scene copy: `SceneTranslation` per locale; missing locales fall back to Serbian.
 - Users can delete their account and all photos/generated media.
 
 ## Local Development
@@ -51,11 +61,12 @@ an automatically edited final "Friend for a Lifetime" film.
 - Ports are project-specific so this app can run alongside Smoki (3000/4000/5432):
   frontend 3100, API 4100, worker health 4101, Postgres 5433, Valkey 6380, storage 9000/9001.
 - Do not run `npm run build` while dev servers are running; use dev servers for iteration.
+- Git commits carry no AI attribution lines.
 
 ## Delivery Phases
 1. Foundation setup — monorepo, skeletons, local environment, CI. (done)
-2. Domain + data — Prisma models: User, Consent, SourcePhoto, Scene, Moment, GenerationJob,
-   FinalFilm, ShareLink; scene catalog seed with age rules.
+2. Domain + data — Prisma models: User, Consent, MediaAsset, Scene, SceneTranslation, Moment,
+   GenerationJob, FinalFilm, ShareLink; scene catalog seed with age rules; `GET /scenes`. (done)
 3. Auth + consent — registration, session cookie, photo processing consent, age rules.
 4. Photo pipeline — upload to private storage, AI photo job, status polling, regenerate with limits.
 5. Video pipeline — video job from approved photo, queue/status, fallback on failure.
