@@ -6,29 +6,21 @@ kratak film i finalni "Friend for a Lifetime" film. Inženjerske odluke su u [AG
 ## Struktura
 
 ```
-frontend/         Next.js 16 aplikacija (app.smoki.local)
-backend/          Fastify API + worker (api.smoki.local)
-packages/shared/  zajedničke zod šeme i tipovi
-dev/              lokalni servisi (docker compose) i Caddy konfiguracija
+frontend/         Next.js 16 aplikacija
+backend/          Fastify API + worker
+packages/shared/  zajednička domenska pravila, zod šeme i tipovi
+dev/              lokalni servisi (docker compose)
 ```
 
 ## Preduslovi
 
 - Node.js 22 (`nvm use`)
 - OrbStack (Docker engine + `docker compose`)
-- Lokalni nginx na portu 80 (Homebrew) i slobodni portovi 5433 (Postgres), 6380 (Valkey), 9000 i 9001 (storage)
+- Slobodni portovi 3100, 4100, 4101, 5433, 6380, 9000 i 9001
 
 ## Lokalno pokretanje
 
-1. Lokalni domeni (jednom). Na macOS-u je to fajl `/etc/hosts` (link na `/private/etc/hosts`):
-
-   ```sh
-   echo "127.0.0.1 app.smoki.local api.smoki.local" | sudo tee -a /etc/hosts
-   ```
-
-   Ili ručno: `sudo nano /etc/hosts`, dodaj liniju, sačuvaj (Ctrl+O, Enter, Ctrl+X).
-
-2. Zavisnosti i env fajlovi:
+1. Zavisnosti i env fajlovi:
 
    ```sh
    npm install
@@ -36,29 +28,20 @@ dev/              lokalni servisi (docker compose) i Caddy konfiguracija
    cp frontend/.env.example frontend/.env.local
    ```
 
-3. Lokalni nginx za domene (jednom). Homebrew nginx već drži port 80, pa on rutira domene:
-
-   ```sh
-   cp dev/nginx/smoki.local.conf "$(brew --prefix)/etc/nginx/servers/"
-   sudo nginx -t && sudo nginx -s reload
-   ```
-
-   Bez lokalnog nginx-a koristi Caddy: `docker compose -f dev/docker-compose.dev.yml --profile proxy up -d`.
-
-4. Servisi (Postgres, Valkey, RustFS storage):
+2. Servisi (Postgres, Valkey, RustFS storage):
 
    ```sh
    npm run dev:services
    ```
 
-5. Baza: migracije i seed scena:
+3. Baza: migracije i seed scena:
 
    ```sh
    npm run prisma:migrate:dev -w @sffl/backend
    npm run db:seed -w @sffl/backend
    ```
 
-6. Dev serveri (frontend, API i worker zajedno, u jednom terminalu):
+4. Dev serveri (frontend, API i worker zajedno, u jednom terminalu):
 
    ```sh
    npm run dev
@@ -66,12 +49,14 @@ dev/              lokalni servisi (docker compose) i Caddy konfiguracija
 
    Pojedinačno: `npm run dev:frontend`, `npm run dev:backend`, `npm run dev:worker`.
 
-Aplikacija: http://app.smoki.local · API health: http://api.smoki.local/health ·
-Scene: http://api.smoki.local/scenes?period=YESTERDAY&age=12&currentAge=36 ·
-Storage konzola (RustFS): http://localhost:9001 (SFFLDEVACCESSKEY / sffl-dev-secret-key)
-
-Portovi su namerno drugačiji od Smoki projekta, pa oba mogu da rade istovremeno:
-frontend 3100, API 4100, worker health 4101, Postgres 5433, Valkey 6380, storage 9000/9001.
+| Servis | Port |
+|---|---|
+| Frontend | 3100 |
+| API | 4100 (health: `/health`) |
+| Worker health | 4101 |
+| Postgres | 5433 |
+| Valkey | 6380 |
+| Storage (RustFS) | 9000 (S3 API), 9001 (konzola) |
 
 ## Produkcioni režim lokalno
 
