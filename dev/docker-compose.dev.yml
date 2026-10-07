@@ -69,8 +69,8 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+    # host.docker.internal is provided by Colima and OrbStack and points to the Mac.
+    # Do not override it with host-gateway: under Colima that resolves to the VM, not the Mac.
 
 volumes:
   postgres_data:

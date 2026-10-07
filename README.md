@@ -15,7 +15,7 @@ dev/              lokalni servisi (docker compose) i Caddy konfiguracija
 ## Preduslovi
 
 - Node.js 22 (`nvm use`)
-- OrbStack ili Docker Desktop
+- Docker engine: Colima (`colima start`) ili OrbStack, uz `docker compose` plugin
 - Slobodni portovi 80, 5432, 6379, 9000 i 9001. Ako DDEV zauzima port 80, pokreni `ddev poweroff`.
 
 ## Lokalno pokretanje
