@@ -26,7 +26,7 @@ an automatically edited final "Friend for a Lifetime" film.
 - Cache/locks/rate-limit: Valkey (Redis protocol, ioredis).
 - Async jobs: dedicated worker process (`src/worker.ts`, `PROCESS_ROLE=api|worker|all`), DB-backed
   job table with statuses, retries and per-user limits (same pattern as Smoki avatar jobs).
-- Storage: private S3-compatible bucket (MinIO locally). User photos and generated media are never public;
+- Storage: private S3-compatible bucket (RustFS locally). User photos and generated media are never public;
   access goes through short-lived signed URLs.
 - AI: image generation via Gemini; video provider TBD (decision in generation phase).
 - Final film montage: ffmpeg in the worker.
@@ -46,7 +46,7 @@ an automatically edited final "Friend for a Lifetime" film.
 
 ## Local Development
 - Domains: `app.smoki.local` (Next.js :3000) and `api.smoki.local` (Fastify :4000) through Caddy.
-- Services: `npm run dev:services` (Postgres, Valkey, MinIO, Caddy).
+- Services: `npm run dev:services` (Postgres, Valkey, RustFS, Caddy).
 - Do not run `npm run build` while dev servers are running; use dev servers for iteration.
 
 ## Delivery Phases

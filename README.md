@@ -15,7 +15,7 @@ dev/              lokalni servisi (docker compose) i Caddy konfiguracija
 ## Preduslovi
 
 - Node.js 22 (`nvm use`)
-- Docker engine: Colima (`colima start`) ili OrbStack, uz `docker compose` plugin
+- OrbStack (Docker engine + `docker compose`)
 - Slobodni portovi 80, 5432, 6379, 9000 i 9001. Ako DDEV zauzima port 80, pokreni `ddev poweroff`.
 
 ## Lokalno pokretanje
@@ -36,7 +36,7 @@ dev/              lokalni servisi (docker compose) i Caddy konfiguracija
    cp frontend/.env.example frontend/.env.local
    ```
 
-3. Servisi (Postgres, Valkey, MinIO, Caddy):
+3. Servisi (Postgres, Valkey, RustFS storage, Caddy):
 
    ```sh
    npm run dev:services
@@ -57,7 +57,7 @@ dev/              lokalni servisi (docker compose) i Caddy konfiguracija
    Pojedinačno: `npm run dev:frontend`, `npm run dev:backend`, `npm run dev:worker`.
 
 Aplikacija: http://app.smoki.local · API health: http://api.smoki.local/health ·
-MinIO konzola: http://localhost:9001 (sffl / sffl-secret)
+Storage konzola (RustFS): http://localhost:9001 (SFFLDEVACCESSKEY / sffl-dev-secret-key)
 
 ## Produkcioni režim lokalno
 

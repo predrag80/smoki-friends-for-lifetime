@@ -29,36 +29,52 @@ services:
     volumes:
       - valkey_data:/data
 
-  minio:
-    image: minio/minio:latest
+  # Local S3-compatible storage (RustFS). MinIO community images are no longer published.
+  # The container runs as uid 10001, so the volume is chowned first.
+  storage-perms:
+    image: alpine:3
+    command: chown -R 10001:10001 /data
+    volumes:
+      - storage_data:/data
+    restart: "no"
+
+  storage:
+    image: rustfs/rustfs:1.0.0
     restart: unless-stopped
-    command: server /data --console-address ":9001"
+    depends_on:
+      storage-perms:
+        condition: service_completed_successfully
     environment:
-      MINIO_ROOT_USER: sffl
-      MINIO_ROOT_PASSWORD: sffl-secret
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ADDRESS: 0.0.0.0:9001
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_ACCESS_KEY: SFFLDEVACCESSKEY
+      RUSTFS_SECRET_KEY: sffl-dev-secret-key
     ports:
       - "9000:9000"
       - "9001:9001"
     volumes:
-      - minio_data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      - storage_data:/data
 
-  # Creates the private bucket once MinIO is up. No anonymous access.
-  minio-init:
-    image: minio/mc:latest
+  # Creates the private bucket once storage is reachable. No public access.
+  storage-init:
+    image: amazon/aws-cli:latest
     depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 sffl sffl-secret &&
-      mc mb --ignore-existing local/sffl-private &&
-      mc anonymous set none local/sffl-private
-      "
+      - storage
+    environment:
+      AWS_ACCESS_KEY_ID: SFFLDEVACCESSKEY
+      AWS_SECRET_ACCESS_KEY: sffl-dev-secret-key
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        for i in $$(seq 1 30); do
+          aws --endpoint-url http://storage:9000 s3api list-buckets >/dev/null 2>&1 && break
+          sleep 1
+        done
+        aws --endpoint-url http://storage:9000 s3api head-bucket --bucket sffl-private 2>/dev/null \
+          || aws --endpoint-url http://storage:9000 s3api create-bucket --bucket sffl-private
     restart: "no"
 
   caddy:
@@ -69,11 +85,11 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
-    # host.docker.internal is provided by Colima and OrbStack and points to the Mac.
-    # Do not override it with host-gateway: under Colima that resolves to the VM, not the Mac.
+    # host.docker.internal is provided by OrbStack and points to the Mac.
+    # Do not override it with host-gateway (under some engines it resolves to the VM).
 
 volumes:
   postgres_data:
   valkey_data:
-  minio_data:
+  storage_data:
   caddy_data:
