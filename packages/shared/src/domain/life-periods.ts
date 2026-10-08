@@ -16,10 +16,6 @@ export const SOMEDAY_MIN_YEARS_AHEAD = 10;
 
 export type AgeRange = { min: number; max: number };
 
-export function getCurrentAge(birthYear: number, now: Date = new Date()): number {
-  return now.getUTCFullYear() - birthYear;
-}
-
 /**
  * Age range offered for a period, or null when the period is not possible for this user
  * (e.g. YESTERDAY for someone who is too young to look visibly younger).

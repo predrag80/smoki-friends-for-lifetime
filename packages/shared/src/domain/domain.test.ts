@@ -2,17 +2,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  getCurrentAge,
   getPeriodAgeRange,
   isAgeInPeriod,
   MAX_SCENE_AGE,
   MIN_SCENE_AGE
 } from "./life-periods.js";
 import { filterScenesByAge, sceneCatalog, territories } from "./scenes.js";
-
-test("current age is derived from birth year", () => {
-  assert.equal(getCurrentAge(1990, new Date("2026-10-07T00:00:00Z")), 36);
-});
 
 test("period age ranges follow the agreed rules", () => {
   assert.deepEqual(getPeriodAgeRange("YESTERDAY", 36), { min: MIN_SCENE_AGE, max: 31 });
