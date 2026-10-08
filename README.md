@@ -11,6 +11,7 @@ frontend/         Next.js 16 application
 backend/          Fastify API + worker
 packages/shared/  shared domain rules, zod schemas and types
 dev/              local services (docker compose)
+deploy/           server stack (Docker, Caddy) and Hetzner setup
 ```
 
 ## Prerequisites
@@ -49,6 +50,7 @@ dev/              local services (docker compose)
    ```
 
    Individually: `npm run dev:frontend`, `npm run dev:backend`, `npm run dev:worker`.
+   Restart `npm run dev` after pulling changes that add new pages or routes.
 
 | Service | Port |
 |---|---|
@@ -83,3 +85,19 @@ npm run build
 ```
 
 CI runs the same steps (`.github/workflows/ci.yml`).
+
+## Deployment
+
+Every push to `main` runs CI and, when it passes, deploys automatically to the dev server
+(`.github/workflows/deploy.yml`). Server setup, secrets and operations are described in
+[deploy/README.md](deploy/README.md).
+
+| Environment | App | API |
+|---|---|---|
+| Dev (Hetzner) | https://smoki-dev.prowebsystems.rs | https://api.smoki-dev.prowebsystems.rs |
+
+## Contributing
+
+- Workflow, commit and database conventions: [AGENTS.md](AGENTS.md) and `.claude/skills/`.
+- Commit messages follow Conventional Commits (`feat:`, `fix:`, `chore:` …).
+- Never commit `.env` files or secrets.
