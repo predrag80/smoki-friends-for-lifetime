@@ -80,6 +80,14 @@ services:
           || aws --endpoint-url http://storage:9000 s3api create-bucket --bucket sffl-private
     restart: "no"
 
+  # Fake SMTP server: every email sent locally lands in the inbox at http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   # Optional: only for machines without a local web server on port 80.
   # Start with: docker compose -f dev/docker-compose.dev.yml --profile proxy up -d
   caddy:

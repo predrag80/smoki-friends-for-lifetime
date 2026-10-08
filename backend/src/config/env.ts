@@ -40,6 +40,31 @@ const envSchema = z.object({
   STORAGE_SECRET_ACCESS_KEY: optionalString,
   STORAGE_FORCE_PATH_STYLE: booleanFromEnv(false),
 
+  // Email (Mailpit locally: SMTP_HOST=localhost, SMTP_PORT=1025)
+  SMTP_HOST: optionalString,
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_SECURE: booleanFromEnv(false),
+  SMTP_USER: optionalString,
+  SMTP_PASS: optionalString,
+  MAIL_FROM: z.string().default("Smoki Friend for a Lifetime <no-reply@smoki.local>"),
+
+  // Token lifetimes
+  EMAIL_VERIFICATION_TTL_HOURS: z.coerce.number().int().positive().default(48),
+  GUARDIAN_CONSENT_TTL_DAYS: z.coerce.number().int().positive().default(14),
+  OAUTH_SIGNUP_TTL_MINUTES: z.coerce.number().int().positive().default(30),
+
+  // Google sign-in. Google only accepts http redirect URIs on localhost, so locally the OAuth
+  // endpoints are reached through http://localhost:4100 while the session cookie is set on API_URL.
+  GOOGLE_OAUTH_CLIENT_ID: optionalString,
+  GOOGLE_OAUTH_CLIENT_SECRET: optionalString,
+  OAUTH_PUBLIC_BASE_URL: optionalString,
+
+  // Versions of the client-owned legal texts the user accepts
+  LEGAL_TERMS_VERSION: z.string().default("draft-2026-10"),
+  LEGAL_PRIVACY_VERSION: z.string().default("draft-2026-10"),
+  LEGAL_PHOTO_PROCESSING_VERSION: z.string().default("draft-2026-10"),
+  LEGAL_MARKETING_VERSION: z.string().default("draft-2026-10"),
+
   GEMINI_API_KEY: optionalString
 });
 
@@ -60,6 +85,15 @@ export function parseEnv(source: NodeJS.ProcessEnv): Env {
   }
 
   return result.data;
+}
+
+/** Public base URL of the OAuth endpoints (start + callback). */
+export function getOAuthBaseUrl(env: Env): string {
+  return (env.OAUTH_PUBLIC_BASE_URL ?? env.API_URL).replace(/\/$/, "");
+}
+
+export function isGoogleConfigured(env: Env): boolean {
+  return Boolean(env.GOOGLE_OAUTH_CLIENT_ID && env.GOOGLE_OAUTH_CLIENT_SECRET);
 }
 
 let cachedEnv: Env | null = null;

@@ -1,3 +1,4 @@
+import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
@@ -5,7 +6,10 @@ import Fastify from "fastify";
 import { getEnv } from "./config/env.js";
 import { prisma } from "./lib/prisma.js";
 import { closeRedisClient, getRedisClient } from "./lib/redis.js";
+import { authRoutes } from "./modules/auth/routes.js";
+import { guardianRoutes } from "./modules/guardian/routes.js";
 import { healthRoutes } from "./modules/health/routes.js";
+import { meRoutes } from "./modules/me/routes.js";
 import { sceneRoutes } from "./modules/scenes/routes.js";
 
 function parseCorsOrigins(value?: string): Set<string> {
@@ -19,11 +23,28 @@ function parseCorsOrigins(value?: string): Set<string> {
 
 export async function buildServer() {
   const env = getEnv();
-  const app = Fastify({ logger: true, trustProxy: true });
+  const app = Fastify({
+    trustProxy: true,
+    logger: {
+      serializers: {
+        // Query strings can contain one-time tokens; never write them to logs.
+        req: (request) => ({
+          method: request.method,
+          url: request.url.split("?")[0],
+          host: request.host,
+          remoteAddress: request.ip
+        })
+      }
+    }
+  });
+  app.decorateRequest("userId", null);
   const allowedOrigins = parseCorsOrigins(env.CORS_ORIGINS);
+
+  await app.register(cookie);
 
   await app.register(cors, {
     credentials: true,
+    methods: ["GET", "POST", "DELETE", "OPTIONS"],
     origin: (origin, callback) => {
       // Same-origin and server-to-server requests have no Origin header.
       if (!origin || allowedOrigins.has(origin)) {
@@ -46,6 +67,9 @@ export async function buildServer() {
 
   await app.register(healthRoutes);
   await app.register(sceneRoutes);
+  await app.register(authRoutes);
+  await app.register(guardianRoutes);
+  await app.register(meRoutes);
 
   app.addHook("onClose", async () => {
     await prisma.$disconnect();

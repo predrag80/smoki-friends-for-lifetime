@@ -40,6 +40,18 @@ enum Territory {
   SPORT_CHEERING
 }
 
+enum AuthProvider {
+  GOOGLE
+}
+
+enum AuthTokenPurpose {
+  EMAIL_VERIFICATION
+  /// One-time hop that turns a completed OAuth login into a session cookie on the API domain.
+  LOGIN_TICKET
+  /// New OAuth user who still has to complete the registration form.
+  OAUTH_SIGNUP
+}
+
 enum ConsentType {
   TERMS
   PRIVACY
@@ -87,23 +99,97 @@ enum FinalFilmStatus {
 // ---------------------------------------------------------------------------
 
 model User {
-  id        String     @id @default(cuid())
-  email     String     @unique
-  /// Only the birth year is stored (data minimisation); current age is derived from it.
-  birthYear Int
-  market    MarketCode
-  locale    AppLocale  @default(sr)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  /// Set when the user requests deletion; media and personal data are purged by a worker.
-  deletedAt DateTime?
+  id              String     @id @default(cuid())
+  /// Always stored lowercase. Replaced with a placeholder when the account is deleted.
+  email           String     @unique
+  emailVerifiedAt DateTime?
+  /// scrypt hash; null for accounts that only sign in with Google.
+  passwordHash    String?
+  /// Only month and year of birth are stored (data minimisation); age is derived from them.
+  birthYear       Int
+  birthMonth      Int
+  market          MarketCode
+  locale          AppLocale  @default(sr)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  /// Set when the user deletes the account; media is purged by a worker.
+  deletedAt       DateTime?
 
-  consents       Consent[]
-  mediaAssets    MediaAsset[]
-  moments        Moment[]
-  generationJobs GenerationJob[]
-  finalFilm      FinalFilm?
-  shareLinks     ShareLink[]
+  sessions        Session[]
+  authTokens      AuthToken[]
+  oauthAccounts   OAuthAccount[]
+  guardianConsent GuardianConsent?
+  consents        Consent[]
+  mediaAssets     MediaAsset[]
+  moments         Moment[]
+  generationJobs  GenerationJob[]
+  finalFilm       FinalFilm?
+  shareLinks      ShareLink[]
+}
+
+model Session {
+  id         String    @id @default(cuid())
+  userId     String
+  /// SHA-256 of the cookie token; the raw token is never stored.
+  tokenHash  String    @unique
+  createdAt  DateTime  @default(now())
+  expiresAt  DateTime
+  lastSeenAt DateTime  @default(now())
+  revokedAt  DateTime?
+  ipAddress  String?
+  userAgent  String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Single-use tokens sent by email or used in redirects. Only the SHA-256 hash is stored.
+model AuthToken {
+  id        String           @id @default(cuid())
+  purpose   AuthTokenPurpose
+  tokenHash String           @unique
+  userId    String?
+  /// Purpose-specific data, e.g. the Google account for OAUTH_SIGNUP.
+  payload   Json?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+}
+
+model OAuthAccount {
+  id                String       @id @default(cuid())
+  userId            String
+  provider          AuthProvider
+  providerAccountId String
+  createdAt         DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+/// Parent/guardian approval for users below the market's digital consent age.
+model GuardianConsent {
+  id                 String    @id @default(cuid())
+  userId             String    @unique
+  guardianEmail      String
+  /// SHA-256 of the link token sent to the guardian; rotated on resend.
+  tokenHash          String    @unique
+  expiresAt          DateTime
+  sentAt             DateTime  @default(now())
+  confirmedAt        DateTime?
+  confirmedIp        String?
+  confirmedUserAgent String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Consent {
