@@ -1,0 +1,183 @@
+/* Shared form and button styles for the auth and account screens. */
+
+.form {
+  display: grid;
+  gap: 1.125rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.label {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.hint {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.input,
+.select {
+  width: 100%;
+  height: 3rem;
+  padding: 0 0.875rem;
+  font: inherit;
+  color: var(--ink);
+  background: var(--white);
+  border: 1.5px solid var(--line);
+  border-radius: 10px;
+}
+
+.input:focus,
+.select:focus {
+  border-color: var(--red);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.check {
+  display: grid;
+  grid-template-columns: 1.25rem 1fr;
+  gap: 0.625rem;
+  align-items: start;
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.check input {
+  width: 1.25rem;
+  height: 1.25rem;
+  margin: 0.125rem 0 0;
+  accent-color: var(--red-deep);
+}
+
+.error {
+  margin: 0;
+  padding: 0.75rem 0.875rem;
+  font-size: 0.9375rem;
+  color: var(--danger);
+  background: #fde8e6;
+  border-radius: 10px;
+}
+
+.notice {
+  margin: 0;
+  padding: 0.75rem 0.875rem;
+  font-size: 0.9375rem;
+  background: var(--yellow-soft);
+  border-radius: 10px;
+}
+
+.primary,
+.secondary,
+.ghost,
+.danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3rem;
+  padding: 0 1.5rem;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.primary {
+  width: 100%;
+  color: var(--white);
+  background: var(--red-deep);
+  border: none;
+}
+
+.primary:hover {
+  background: var(--red-deeper);
+}
+
+.primary:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.secondary {
+  width: 100%;
+  color: var(--ink);
+  background: var(--white);
+  border: 1.5px solid var(--line);
+}
+
+.secondary:hover {
+  border-color: var(--ink-soft);
+}
+
+.ghost {
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  color: var(--red-deep);
+  background: transparent;
+  border: 1.5px solid var(--red-deep);
+}
+
+.danger {
+  min-height: 2.5rem;
+  padding: 0 1rem;
+  color: var(--white);
+  background: var(--danger);
+  border: none;
+}
+
+.divider {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0.75rem;
+  align-items: center;
+  font-size: 0.875rem;
+  color: var(--ink-soft);
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  height: 1px;
+  background: var(--line);
+}
+
+.footnote {
+  margin: 0;
+  font-size: 0.9375rem;
+  text-align: center;
+}
+
+.footnote a {
+  font-weight: 700;
+  color: var(--red-deep);
+}
+
+.fieldset {
+  display: grid;
+  gap: 0.375rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.stack {
+  display: grid;
+  gap: 1.125rem;
+}
+
+.fieldset legend {
+  padding: 0;
+  margin-bottom: 0.375rem;
+}

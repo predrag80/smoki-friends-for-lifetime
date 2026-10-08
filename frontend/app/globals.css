@@ -1,3 +1,26 @@
+/* Smoki brand palette (taken from the Smoki project). */
+:root {
+  --red: #d0232a;
+  --red-deep: #7a1115;
+  --red-deeper: #5e0c11;
+  --yellow: #ffd533;
+  --yellow-soft: #fee066;
+  --paper: #fffaf3;
+  --white: #ffffff;
+  --ink: #1a1a1a;
+  --ink-soft: #6b4040;
+  --line: #e4c8bf;
+  --on-red-soft: #ffe1db;
+  --success: #1b6e42;
+  --danger: #a3161c;
+
+  --font-body: var(--font-inter), "Segoe UI", system-ui, sans-serif;
+  --font-display: var(--font-oswald), "Arial Narrow", "Avenir Next Condensed", sans-serif;
+
+  --page-gutter: clamp(1rem, 4vw, 2.5rem);
+  --content-width: 72rem;
+}
+
 *,
 *::before,
 *::after {
@@ -7,5 +30,31 @@
 html,
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--red);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 3px solid var(--yellow);
+  outline-offset: 3px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
