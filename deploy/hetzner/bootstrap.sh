@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One-time setup for a server created WITHOUT cloud-init (same result as cloud-init.yaml).
-# Run from your machine:
-#   ssh -i ~/.ssh/sffl_deploy root@<server-ip> 'bash -s' < deploy/hetzner/bootstrap.sh
+# Run from your machine (root login with the SSH key chosen when the server was created):
+#   ssh root@<server-ip> "DEPLOY_PUBLIC_KEY='$(cat ~/.ssh/sffl_deploy.pub)' bash -s" < deploy/hetzner/bootstrap.sh
 # Installs Docker, creates the "deploy" user with the GitHub Actions key, enables the firewall.
 set -euo pipefail
 
@@ -25,10 +25,12 @@ fi
 usermod -aG docker deploy
 passwd -l deploy >/dev/null
 
-# Authorize only the deploy key (comment "github-actions-deploy") for the deploy user.
+# Authorize only the GitHub Actions deploy key for the deploy user.
 install -d -m 700 -o deploy -g deploy /home/deploy/.ssh
-if ! grep -h "github-actions-deploy" /root/.ssh/authorized_keys > /home/deploy/.ssh/authorized_keys; then
-  echo "No key with comment 'github-actions-deploy' in /root/.ssh/authorized_keys." >&2
+if [ -n "${DEPLOY_PUBLIC_KEY:-}" ]; then
+  printf '%s\n' "$DEPLOY_PUBLIC_KEY" > /home/deploy/.ssh/authorized_keys
+elif ! grep -h "github-actions-deploy" /root/.ssh/authorized_keys > /home/deploy/.ssh/authorized_keys; then
+  echo "Pass DEPLOY_PUBLIC_KEY (content of ~/.ssh/sffl_deploy.pub)." >&2
   exit 1
 fi
 chown deploy:deploy /home/deploy/.ssh/authorized_keys

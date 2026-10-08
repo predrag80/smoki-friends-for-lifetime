@@ -33,7 +33,8 @@ Each needs an A record pointing to the server's IPv4 address.
    `ssh-keygen -t ed25519 -C "github-actions-deploy@smoki-dev" -f ~/.ssh/sffl_deploy -N ""`
 2. Create the server (Ubuntu) with `~/.ssh/sffl_deploy.pub` as its SSH key, then either
    - paste `deploy/hetzner/cloud-init.yaml` as "Cloud config" (with `__DEPLOY_PUBLIC_KEY__` replaced), or
-   - after creation run `ssh -i ~/.ssh/sffl_deploy root@<server-ip> 'bash -s' < deploy/hetzner/bootstrap.sh`.
+   - after creation run
+     `ssh root@<server-ip> "DEPLOY_PUBLIC_KEY='$(cat ~/.ssh/sffl_deploy.pub)' bash -s" < deploy/hetzner/bootstrap.sh`.
 
    Current dev server: CPX22, Falkenstein, `138.201.152.23`.
 3. GitHub repository → Settings → Secrets and variables → Actions:
