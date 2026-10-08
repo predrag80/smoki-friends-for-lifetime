@@ -5,7 +5,7 @@ import { getEnv } from "../../config/env.js";
 import { generateToken, hashToken } from "../../lib/crypto.js";
 import { sendMail } from "../../lib/mailer.js";
 import { prisma } from "../../lib/prisma.js";
-import { guardianConsentMessage, verifyEmailMessage } from "./emails.js";
+import { guardianConsentMessage, passwordChangedMessage, passwordResetMessage, verifyEmailMessage } from "./emails.js";
 import type { RequestMeta } from "./session.js";
 
 type Logger = { info: (obj: object, msg?: string) => void; error: (obj: object, msg?: string) => void };
@@ -131,6 +131,31 @@ export async function sendVerificationEmail(
   });
   const link = `${env.APP_URL}/verify-email?token=${encodeURIComponent(token)}`;
   await sendMail(verifyEmailMessage(user.locale, user.email, link), logger);
+}
+
+/** Invalidates earlier reset links and emails a new one. */
+export async function sendPasswordResetEmail(
+  user: { id: string; email: string; locale: AppLocale },
+  logger: Logger
+): Promise<void> {
+  const env = getEnv();
+  await prisma.authToken.updateMany({
+    where: { userId: user.id, purpose: "PASSWORD_RESET", usedAt: null },
+    data: { usedAt: new Date() }
+  });
+  const token = await issueAuthToken("PASSWORD_RESET", {
+    userId: user.id,
+    ttlMs: env.PASSWORD_RESET_TTL_MINUTES * 60 * 1000
+  });
+  const link = `${env.APP_URL}/reset-password?token=${encodeURIComponent(token)}`;
+  await sendMail(passwordResetMessage(user.locale, user.email, link, env.PASSWORD_RESET_TTL_MINUTES), logger);
+}
+
+export async function sendPasswordChangedEmail(
+  user: { email: string; locale: AppLocale },
+  logger: Logger
+): Promise<void> {
+  await sendMail(passwordChangedMessage(user.locale, user.email, `${getEnv().APP_URL}/login`), logger);
 }
 
 export async function sendGuardianEmail(

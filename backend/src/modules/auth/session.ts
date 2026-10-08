@@ -57,6 +57,11 @@ export async function revokeSession(token: string): Promise<void> {
   });
 }
 
+/** Ends every session of a user, e.g. after a password change. */
+export async function revokeAllSessions(userId: string): Promise<void> {
+  await prisma.session.updateMany({ where: { userId, revokedAt: null }, data: { revokedAt: new Date() } });
+}
+
 function cookieOptions() {
   const env = getEnv();
   return {

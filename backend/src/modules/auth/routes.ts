@@ -1,7 +1,10 @@
 import {
+  checkPasswordStrength,
   completeOAuthSignupRequestSchema,
+  forgotPasswordRequestSchema,
   loginRequestSchema,
   registerRequestSchema,
+  resetPasswordRequestSchema,
   tokenRequestSchema
 } from "@sffl/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
@@ -17,13 +20,22 @@ import {
   findAuthToken,
   issueAuthToken,
   sendGuardianEmail,
+  sendPasswordChangedEmail,
+  sendPasswordResetEmail,
   sendVerificationEmail
 } from "./accounts.js";
 import { buildGoogleAuthUrl, exchangeGoogleCode } from "./google.js";
 import { loadMe } from "./load-me.js";
 import { evaluateRegistration } from "./registration.js";
 import { getUserId, requireUser } from "./require-user.js";
-import { clearSessionCookie, getRequestMeta, readSessionToken, revokeSession, startSession } from "./session.js";
+import {
+  clearSessionCookie,
+  getRequestMeta,
+  readSessionToken,
+  revokeAllSessions,
+  revokeSession,
+  startSession
+} from "./session.js";
 
 /** Stricter limit for endpoints that could be used to guess passwords or spam emails. */
 const strictRateLimit = { rateLimit: { max: 10, timeWindow: "1 minute" } };
@@ -58,6 +70,8 @@ export async function authRoutes(app: FastifyInstance) {
     if (!parsed.success) return invalidBody(reply, parsed.error.issues);
 
     const body = parsed.data;
+    if (checkPasswordStrength(body.password, body.email)) return reply.code(422).send({ error: "WEAK_PASSWORD" });
+
     const decision = evaluateRegistration(body);
     if (!decision.ok) return reply.code(422).send({ error: decision.error });
 
@@ -120,6 +134,64 @@ export async function authRoutes(app: FastifyInstance) {
   });
 
   app.get("/auth/me", { preHandler: requireUser }, async (request) => loadMe(getUserId(request)));
+
+  // ---------------------------------------------------------------------------
+  // Password reset
+  // ---------------------------------------------------------------------------
+
+  /** Always answers 202 so the response never reveals whether an account exists. */
+  app.post(
+    "/auth/password/forgot",
+    { config: { rateLimit: { max: 5, timeWindow: "10 minutes" } } },
+    async (request, reply) => {
+      const parsed = forgotPasswordRequestSchema.safeParse(request.body);
+      if (!parsed.success) return invalidBody(reply, parsed.error.issues);
+
+      const user = await prisma.user.findFirst({
+        where: { email: parsed.data.email, deletedAt: null },
+        select: { id: true, email: true, locale: true }
+      });
+      if (user) {
+        // Not awaited, so the response time does not reveal whether the account exists.
+        void sendPasswordResetEmail(user, request.log).catch((error: unknown) =>
+          request.log.error({ err: error }, "Password reset email failed")
+        );
+      }
+
+      return reply.code(202).send({ sent: true });
+    }
+  );
+
+  app.post("/auth/password/reset", { config: strictRateLimit }, async (request, reply) => {
+    const parsed = resetPasswordRequestSchema.safeParse(request.body);
+    if (!parsed.success) return invalidBody(reply, parsed.error.issues);
+
+    const lookup = await findAuthToken("PASSWORD_RESET", parsed.data.token);
+    if (lookup.status === "expired") return reply.code(410).send({ error: "TOKEN_EXPIRED" });
+    if (lookup.status !== "valid" || !lookup.token.userId) return reply.code(400).send({ error: "INVALID_TOKEN" });
+
+    const user = await prisma.user.findFirst({
+      where: { id: lookup.token.userId, deletedAt: null },
+      select: { id: true, email: true, locale: true, emailVerifiedAt: true }
+    });
+    if (!user) return reply.code(400).send({ error: "INVALID_TOKEN" });
+    if (checkPasswordStrength(parsed.data.password, user.email)) return reply.code(422).send({ error: "WEAK_PASSWORD" });
+    if (!(await consumeAuthToken(lookup.token.id))) return reply.code(400).send({ error: "INVALID_TOKEN" });
+
+    // The link proved access to the mailbox, so the address counts as verified.
+    await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: await hashPassword(parsed.data.password),
+        ...(user.emailVerifiedAt ? {} : { emailVerifiedAt: new Date() })
+      }
+    });
+    await revokeAllSessions(user.id);
+    await sendPasswordChangedEmail(user, request.log);
+
+    await startSession(reply, user.id, getRequestMeta(request));
+    return reply.send(await loadMe(user.id));
+  });
 
   // ---------------------------------------------------------------------------
   // Email verification

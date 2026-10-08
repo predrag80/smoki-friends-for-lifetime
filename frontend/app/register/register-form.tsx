@@ -1,6 +1,6 @@
 "use client";
 
-import { PASSWORD_MIN_LENGTH, type MeResponse, type RegisterRequest } from "@sffl/shared";
+import type { MeResponse, RegisterRequest } from "@sffl/shared";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -12,12 +12,23 @@ import {
   deriveProfile,
   emptyProfile,
   ProfileFields,
+  profileFieldByServerError,
   toProfilePayload,
-  validateProfile
+  validateProfile,
+  type ProfileErrors
 } from "../components/profile-fields";
+import { TextField } from "../components/text-field";
 import ui from "../components/ui.module.css";
 import { apiFetch, errorCode } from "../lib/api";
 import { errorMessage } from "../lib/messages";
+import { hasErrors, validateEmailField, validateNewPassword, validatePasswordConfirm } from "../lib/validation";
+
+type AccountErrors = Partial<Record<"email" | "password" | "passwordConfirm", string>>;
+
+const accountFieldByServerError: Record<string, keyof AccountErrors> = {
+  EMAIL_TAKEN: "email",
+  WEAK_PASSWORD: "password"
+};
 
 export function RegisterForm() {
   const { locale, messages } = useMessages();
@@ -25,8 +36,11 @@ export function RegisterForm() {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [profile, setProfile] = useState(emptyProfile);
-  const [error, setError] = useState<string | null>(null);
+  const [accountErrors, setAccountErrors] = useState<AccountErrors>({});
+  const [profileErrors, setProfileErrors] = useState<ProfileErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
 
   const register = useMutation({
     mutationFn: (body: RegisterRequest) => apiFetch<MeResponse>("/auth/register", { method: "POST", body }),
@@ -35,19 +49,34 @@ export function RegisterForm() {
       router.push("/account");
       router.refresh();
     },
-    onError: (failure) => setError(errorCode(failure))
+    onError: (failure) => {
+      const code = errorCode(failure);
+      const accountField = accountFieldByServerError[code];
+      const profileField = profileFieldByServerError[code];
+      if (accountField) setAccountErrors({ [accountField]: code });
+      else if (profileField) setProfileErrors({ [profileField]: code });
+      else setFormError(code);
+    }
   });
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError(null);
-
-    if (!email.includes("@")) return setError("invalidEmail");
-    if (password.length < PASSWORD_MIN_LENGTH) return setError("passwordShort");
+    setFormError(null);
 
     const derived = deriveProfile(profile);
-    const profileError = validateProfile(profile, derived);
-    if (profileError) return setError(profileError);
+    const nextAccountErrors: AccountErrors = {
+      email: validateEmailField(email),
+      password: validateNewPassword(password, email),
+      passwordConfirm: validatePasswordConfirm(password, passwordConfirm)
+    };
+    const nextProfileErrors = validateProfile(profile, derived, email);
+    setAccountErrors(nextAccountErrors);
+    setProfileErrors(nextProfileErrors);
+
+    if (hasErrors(nextAccountErrors) || hasErrors(nextProfileErrors)) {
+      setFormError("formHasErrors");
+      return;
+    }
 
     register.mutate({ email: email.trim(), password, ...toProfilePayload(profile, derived, locale) });
   }
@@ -55,36 +84,40 @@ export function RegisterForm() {
   return (
     <div className={ui.stack}>
       <form className={ui.form} onSubmit={onSubmit} noValidate>
-        <label className={ui.field}>
-          <span className={ui.label}>{messages.form.email}</span>
-          <input
-            className={ui.input}
-            type="email"
-            autoComplete="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-        </label>
-        <label className={ui.field}>
-          <span className={ui.label}>{messages.form.password}</span>
-          <input
-            className={ui.input}
-            type="password"
-            autoComplete="new-password"
-            minLength={PASSWORD_MIN_LENGTH}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-          <span className={ui.hint}>{messages.form.passwordHint}</span>
-        </label>
+        <TextField
+          label={messages.form.email}
+          type="email"
+          autoComplete="email"
+          maxLength={254}
+          value={email}
+          onChange={setEmail}
+          error={accountErrors.email}
+        />
+        <TextField
+          label={messages.form.password}
+          type="password"
+          autoComplete="new-password"
+          maxLength={200}
+          value={password}
+          onChange={setPassword}
+          hint={messages.form.passwordHint}
+          error={accountErrors.password}
+        />
+        <TextField
+          label={messages.form.passwordConfirm}
+          type="password"
+          autoComplete="new-password"
+          maxLength={200}
+          value={passwordConfirm}
+          onChange={setPasswordConfirm}
+          error={accountErrors.passwordConfirm}
+        />
 
-        <ProfileFields value={profile} onChange={setProfile} />
+        <ProfileFields value={profile} onChange={setProfile} errors={profileErrors} />
 
-        {error ? (
+        {formError ? (
           <p className={ui.error} role="alert">
-            {errorMessage(messages, error)}
+            {errorMessage(messages, formError)}
           </p>
         ) : null}
 

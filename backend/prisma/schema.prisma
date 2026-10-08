@@ -50,6 +50,7 @@ enum AuthTokenPurpose {
   LOGIN_TICKET
   /// New OAuth user who still has to complete the registration form.
   OAUTH_SIGNUP
+  PASSWORD_RESET
 }
 
 enum ConsentType {

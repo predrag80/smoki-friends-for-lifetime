@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { readinessSteps } from "../domain/account.js";
 import { appLocales, marketCodes } from "../domain/markets.js";
+import { PASSWORD_MAX_LENGTH } from "../domain/password.js";
 
 export const consentTypes = ["TERMS", "PRIVACY", "PHOTO_PROCESSING", "MARKETING"] as const;
 export type ConsentType = (typeof consentTypes)[number];
@@ -12,9 +13,15 @@ export const userManagedConsentTypes = ["PHOTO_PROCESSING", "MARKETING"] as cons
 export const authProviders = ["GOOGLE"] as const;
 export type AuthProvider = (typeof authProviders)[number];
 
-export const PASSWORD_MIN_LENGTH = 8;
+/** Trims and lowercases before validating, so " Ana@Mail.com " is accepted as "ana@mail.com". */
+export const emailSchema = z.string().trim().toLowerCase().pipe(z.email().max(254));
 
-const emailSchema = z.email().max(254).transform((value) => value.trim().toLowerCase());
+export function isValidEmail(value: string): boolean {
+  return emailSchema.safeParse(value).success;
+}
+
+/** Length bounds only; strength rules are checked with checkPasswordStrength (422 WEAK_PASSWORD). */
+const passwordSchema = z.string().min(1).max(PASSWORD_MAX_LENGTH);
 
 /** Profile data collected at registration, for both email/password and Google sign-up. */
 export const profileFieldsSchema = z.object({
@@ -30,7 +37,7 @@ export const profileFieldsSchema = z.object({
 
 export const registerRequestSchema = profileFieldsSchema.extend({
   email: emailSchema,
-  password: z.string().min(PASSWORD_MIN_LENGTH).max(200)
+  password: passwordSchema
 });
 export type RegisterRequest = z.input<typeof registerRequestSchema>;
 
@@ -46,6 +53,12 @@ export const loginRequestSchema = z.object({
 export type LoginRequest = z.input<typeof loginRequestSchema>;
 
 export const tokenRequestSchema = z.object({ token: z.string().min(20).max(200) });
+
+export const forgotPasswordRequestSchema = z.object({ email: emailSchema });
+export type ForgotPasswordRequest = z.input<typeof forgotPasswordRequestSchema>;
+
+export const resetPasswordRequestSchema = tokenRequestSchema.extend({ password: passwordSchema });
+export type ResetPasswordRequest = z.input<typeof resetPasswordRequestSchema>;
 
 export const guardianConfirmRequestSchema = tokenRequestSchema.extend({ accept: z.literal(true) });
 
@@ -109,6 +122,7 @@ export type GuardianLookupResponse = z.infer<typeof guardianLookupResponseSchema
 export const authErrorCodes = [
   "INVALID_BODY",
   "INVALID_BIRTH_DATE",
+  "WEAK_PASSWORD",
   "UNDER_MIN_AGE",
   "GUARDIAN_EMAIL_REQUIRED",
   "GUARDIAN_EMAIL_SAME_AS_USER",

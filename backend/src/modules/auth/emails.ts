@@ -38,6 +38,26 @@ const guardianCopy: LocalizedCopy = {
   }
 };
 
+const passwordResetCopy: LocalizedCopy = {
+  sr: {
+    subject: "Nova lozinka",
+    heading: "Postavi novu lozinku",
+    body: "Neko je zatražio novu lozinku za tvoj nalog. Klikni na dugme da je postaviš. Link važi {minutes} minuta.",
+    cta: "Postavi novu lozinku",
+    footer: "Ako nisi ti tražio novu lozinku, ignoriši ovu poruku. Tvoja lozinka ostaje ista."
+  }
+};
+
+const passwordChangedCopy: LocalizedCopy = {
+  sr: {
+    subject: "Lozinka je promenjena",
+    heading: "Tvoja lozinka je promenjena",
+    body: "Lozinka za tvoj nalog je upravo promenjena i odjavili smo te sa ostalih uređaja.",
+    cta: "Prijavi se",
+    footer: "Ako ovo nisi bio ti, odmah zatraži novu lozinku preko stranice za prijavu."
+  }
+};
+
 function pickCopy(copies: LocalizedCopy, locale: AppLocale): EmailCopy {
   return copies[locale] ?? copies.sr;
 }
@@ -86,4 +106,14 @@ export function guardianConsentMessage(
   const copy = pickCopy(guardianCopy, locale);
   const body = copy.body.replace("{child}", maskedChildEmail);
   return { to, subject: copy.subject, ...render(copy, link, body) };
+}
+
+export function passwordResetMessage(locale: AppLocale, to: string, link: string, minutes: number): MailMessage {
+  const copy = pickCopy(passwordResetCopy, locale);
+  return { to, subject: copy.subject, ...render(copy, link, copy.body.replace("{minutes}", String(minutes))) };
+}
+
+export function passwordChangedMessage(locale: AppLocale, to: string, loginLink: string): MailMessage {
+  const copy = pickCopy(passwordChangedCopy, locale);
+  return { to, subject: copy.subject, ...render(copy, loginLink, copy.body) };
 }

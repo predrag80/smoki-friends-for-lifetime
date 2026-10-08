@@ -42,7 +42,8 @@ const sr = {
   form: {
     email: "Email",
     password: "Lozinka",
-    passwordHint: "Najmanje 8 karaktera.",
+    passwordConfirm: "Ponovi lozinku",
+    passwordHint: "Najmanje 8 karaktera, bar jedno slovo i jedan broj.",
     birth: "Mesec i godina rođenja",
     month: "Mesec",
     year: "Godina",
@@ -78,9 +79,27 @@ const sr = {
     title: "Prijavi se",
     submit: "Prijavi se",
     submitting: "Prijavljujemo…",
+    forgot: "Zaboravio/la si lozinku?",
     noAccount: "Nemaš nalog?",
     register: "Napravi nalog",
     googleError: "Prijava preko Google naloga nije uspela. Pokušaj ponovo."
+  },
+  forgot: {
+    title: "Zaboravljena lozinka",
+    subtitle: "Unesi email adresu naloga i poslaćemo ti link za novu lozinku.",
+    submit: "Pošalji link",
+    submitting: "Šaljemo…",
+    sent: "Ako nalog sa ovom adresom postoji, poslali smo link za novu lozinku. Link važi 60 minuta.",
+    back: "Nazad na prijavu"
+  },
+  reset: {
+    title: "Nova lozinka",
+    password: "Nova lozinka",
+    submit: "Sačuvaj lozinku",
+    submitting: "Čuvamo…",
+    success: "Lozinka je promenjena i prijavljen/a si. Sa ostalih uređaja smo te odjavili.",
+    continue: "Idi na moj nalog",
+    requestNew: "Zatraži novi link"
   },
   verify: {
     title: "Potvrda email adrese",
@@ -162,6 +181,7 @@ const sr = {
   errors: {
     INVALID_BODY: "Proveri unete podatke.",
     INVALID_BIRTH_DATE: "Datum rođenja nije ispravan.",
+    WEAK_PASSWORD: "Lozinka mora da ima najmanje 8 karaktera, bar jedno slovo i jedan broj, i ne sme da bude ista kao email.",
     UNDER_MIN_AGE: "Aplikacija je dostupna od 12 godina.",
     GUARDIAN_EMAIL_REQUIRED: "Unesi email roditelja ili staratelja.",
     GUARDIAN_EMAIL_SAME_AS_USER: "Email roditelja mora da bude drugačiji od tvog.",
@@ -180,6 +200,16 @@ const sr = {
     UNKNOWN: "Nešto nije u redu. Pokušaj ponovo.",
     invalidEmail: "Unesi ispravnu email adresu.",
     passwordShort: "Lozinka mora da ima najmanje 8 karaktera.",
+    passwordTooLong: "Lozinka može da ima najviše 200 karaktera.",
+    passwordLetterNumber: "Lozinka mora da sadrži bar jedno slovo i jedan broj.",
+    passwordSameAsEmail: "Lozinka ne sme da bude ista kao email adresa.",
+    passwordMismatch: "Lozinke se ne poklapaju.",
+    emailRequired: "Unesi email adresu.",
+    passwordRequired: "Unesi lozinku.",
+    birthRequired: "Izaberi mesec i godinu rođenja.",
+    marketRequired: "Izaberi državu.",
+    guardianEmailInvalid: "Unesi ispravan email roditelja ili staratelja.",
+    formHasErrors: "Ispravi označena polja.",
     acceptRequired: "Potrebno je da prihvatiš uslove i politiku privatnosti.",
     required: "Popuni sva obavezna polja."
   } satisfies Record<AuthErrorCode | "RATE_LIMITED" | "NETWORK" | "UNKNOWN", string> & Record<string, string>

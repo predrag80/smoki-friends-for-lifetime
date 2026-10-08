@@ -1,90 +1,30 @@
 "use client";
 
-import {
-  canOfferMarketing,
-  digitalConsentAgeByMarket,
-  getAge,
-  isValidBirth,
-  marketCodes,
-  MIN_USER_AGE,
-  requiresGuardianConsent,
-  type AppLocale,
-  type MarketCode
-} from "@sffl/shared";
+import { marketCodes, type MarketCode } from "@sffl/shared";
 
-import { format } from "../lib/messages";
+import { errorMessage, format } from "../lib/messages";
+import { deriveProfile, type ProfileErrors, type ProfileState } from "../lib/profile";
 import { useMessages } from "./messages-provider";
+import { TextField } from "./text-field";
 import ui from "./ui.module.css";
 
-export type ProfileState = {
-  birthMonth: string;
-  birthYear: string;
-  market: MarketCode | "";
-  guardianEmail: string;
-  acceptTerms: boolean;
-  acceptPrivacy: boolean;
-  marketingOptIn: boolean;
+export {
+  deriveProfile,
+  emptyProfile,
+  profileFieldByServerError,
+  toProfilePayload,
+  validateProfile,
+  type ProfileErrors,
+  type ProfileState
+} from "../lib/profile";
+
+type ProfileFieldsProps = {
+  value: ProfileState;
+  onChange: (value: ProfileState) => void;
+  errors?: ProfileErrors;
 };
 
-export const emptyProfile: ProfileState = {
-  birthMonth: "",
-  birthYear: "",
-  market: "",
-  guardianEmail: "",
-  acceptTerms: false,
-  acceptPrivacy: false,
-  marketingOptIn: false
-};
-
-export type DerivedProfile = {
-  age: number | null;
-  underAge: boolean;
-  guardianRequired: boolean;
-  consentAge: number | null;
-  marketingAllowed: boolean;
-};
-
-/** Same rules as the backend (shared package), so the form reacts while the user types. */
-export function deriveProfile(state: ProfileState, now: Date = new Date()): DerivedProfile {
-  const birth = { month: Number(state.birthMonth), year: Number(state.birthYear) };
-  const age = state.birthMonth && state.birthYear && isValidBirth(birth, now) ? getAge(birth, now) : null;
-  const market = state.market || null;
-
-  return {
-    age,
-    underAge: age !== null && age < MIN_USER_AGE,
-    guardianRequired: age !== null && market !== null && age >= MIN_USER_AGE && requiresGuardianConsent(age, market),
-    consentAge: market ? digitalConsentAgeByMarket[market] : null,
-    marketingAllowed: age !== null && canOfferMarketing(age)
-  };
-}
-
-/** Returns an error key from messages.errors, or null when the profile can be submitted. */
-export function validateProfile(state: ProfileState, derived: DerivedProfile): string | null {
-  if (!state.birthMonth || !state.birthYear || !state.market) return "required";
-  if (derived.age === null) return "INVALID_BIRTH_DATE";
-  if (derived.underAge) return "UNDER_MIN_AGE";
-  if (derived.guardianRequired && !state.guardianEmail.includes("@")) return "GUARDIAN_EMAIL_REQUIRED";
-  if (!state.acceptTerms || !state.acceptPrivacy) return "acceptRequired";
-  return null;
-}
-
-export function toProfilePayload(state: ProfileState, derived: DerivedProfile, locale: AppLocale) {
-  return {
-    birthMonth: Number(state.birthMonth),
-    birthYear: Number(state.birthYear),
-    market: state.market as MarketCode,
-    locale,
-    acceptTerms: true as const,
-    acceptPrivacy: true as const,
-    marketingOptIn: derived.marketingAllowed && state.marketingOptIn,
-    guardianEmail: derived.guardianRequired ? state.guardianEmail.trim() : undefined
-  };
-}
-
-type ProfileFieldsProps = { value: ProfileState; onChange: (value: ProfileState) => void };
-
-export function ProfileFields({ value, onChange }: ProfileFieldsProps) {
+export function ProfileFields({ value, onChange, errors = {} }: ProfileFieldsProps) {
   const { messages } = useMessages();
   const f = messages.form;
   const derived = deriveProfile(value);
@@ -95,9 +35,11 @@ export function ProfileFields({ value, onChange }: ProfileFieldsProps) {
     onChange({ ...value, [key]: next });
   }
 
+  const birthError = errors.birth ?? (derived.underAge ? "UNDER_MIN_AGE" : undefined);
+
   return (
     <>
-      <fieldset className={ui.fieldset}>
+      <fieldset className={ui.fieldset} aria-describedby={birthError ? "birth-error" : undefined}>
         <legend className={ui.label}>{f.birth}</legend>
         <div className={ui.row}>
           <label>
@@ -105,8 +47,8 @@ export function ProfileFields({ value, onChange }: ProfileFieldsProps) {
             <select
               className={ui.select}
               value={value.birthMonth}
+              aria-invalid={birthError ? true : undefined}
               onChange={(event) => set("birthMonth", event.target.value)}
-              required
             >
               <option value="">{f.month}</option>
               {messages.months.map((month, index) => (
@@ -121,8 +63,8 @@ export function ProfileFields({ value, onChange }: ProfileFieldsProps) {
             <select
               className={ui.select}
               value={value.birthYear}
+              aria-invalid={birthError ? true : undefined}
               onChange={(event) => set("birthYear", event.target.value)}
-              required
             >
               <option value="">{f.year}</option>
               {years.map((year) => (
@@ -133,17 +75,21 @@ export function ProfileFields({ value, onChange }: ProfileFieldsProps) {
             </select>
           </label>
         </div>
+        {birthError ? (
+          <p id="birth-error" className={ui.fieldError}>
+            {errorMessage(messages, birthError)}
+          </p>
+        ) : null}
       </fieldset>
-
-      {derived.underAge ? <p className={ui.error}>{messages.errors.UNDER_MIN_AGE}</p> : null}
 
       <label className={ui.field}>
         <span className={ui.label}>{f.market}</span>
         <select
           className={ui.select}
           value={value.market}
+          aria-invalid={errors.market ? true : undefined}
+          aria-describedby={errors.market ? "market-error" : undefined}
           onChange={(event) => set("market", event.target.value as MarketCode | "")}
-          required
         >
           <option value="">{f.choose}</option>
           {marketCodes.map((market) => (
@@ -152,49 +98,57 @@ export function ProfileFields({ value, onChange }: ProfileFieldsProps) {
             </option>
           ))}
         </select>
+        {errors.market ? (
+          <span id="market-error" className={ui.fieldError}>
+            {errorMessage(messages, errors.market)}
+          </span>
+        ) : null}
       </label>
 
       {derived.guardianRequired ? (
-        <label className={ui.field}>
-          <span className={ui.label}>{f.guardianEmail}</span>
-          <input
-            className={ui.input}
-            type="email"
-            autoComplete="off"
-            value={value.guardianEmail}
-            onChange={(event) => set("guardianEmail", event.target.value)}
-            required
-          />
-          <span className={ui.hint}>{format(f.guardianHint, { age: derived.consentAge ?? "" })}</span>
-        </label>
+        <TextField
+          label={f.guardianEmail}
+          type="email"
+          autoComplete="off"
+          maxLength={254}
+          value={value.guardianEmail}
+          onChange={(next) => set("guardianEmail", next)}
+          hint={format(f.guardianHint, { age: derived.consentAge ?? "" })}
+          error={errors.guardianEmail}
+        />
       ) : null}
 
-      <label className={ui.check}>
-        <input
-          type="checkbox"
-          checked={value.acceptTerms}
-          onChange={(event) => set("acceptTerms", event.target.checked)}
-        />
-        <span>{f.acceptTerms}</span>
-      </label>
-      <label className={ui.check}>
-        <input
-          type="checkbox"
-          checked={value.acceptPrivacy}
-          onChange={(event) => set("acceptPrivacy", event.target.checked)}
-        />
-        <span>{f.acceptPrivacy}</span>
-      </label>
-      {derived.marketingAllowed ? (
+      <div className={ui.stack}>
         <label className={ui.check}>
           <input
             type="checkbox"
-            checked={value.marketingOptIn}
-            onChange={(event) => set("marketingOptIn", event.target.checked)}
+            checked={value.acceptTerms}
+            aria-invalid={errors.accept && !value.acceptTerms ? true : undefined}
+            onChange={(event) => set("acceptTerms", event.target.checked)}
           />
-          <span>{f.marketing}</span>
+          <span>{f.acceptTerms}</span>
         </label>
-      ) : null}
+        <label className={ui.check}>
+          <input
+            type="checkbox"
+            checked={value.acceptPrivacy}
+            aria-invalid={errors.accept && !value.acceptPrivacy ? true : undefined}
+            onChange={(event) => set("acceptPrivacy", event.target.checked)}
+          />
+          <span>{f.acceptPrivacy}</span>
+        </label>
+        {errors.accept ? <p className={ui.fieldError}>{errorMessage(messages, errors.accept)}</p> : null}
+        {derived.marketingAllowed ? (
+          <label className={ui.check}>
+            <input
+              type="checkbox"
+              checked={value.marketingOptIn}
+              onChange={(event) => set("marketingOptIn", event.target.checked)}
+            />
+            <span>{f.marketing}</span>
+          </label>
+        ) : null}
+      </div>
       <p className={ui.hint}>{f.legalPending}</p>
     </>
   );

@@ -11,12 +11,15 @@ import {
   deriveProfile,
   emptyProfile,
   ProfileFields,
+  profileFieldByServerError,
   toProfilePayload,
-  validateProfile
+  validateProfile,
+  type ProfileErrors
 } from "../../components/profile-fields";
 import ui from "../../components/ui.module.css";
 import { apiFetch, errorCode } from "../../lib/api";
 import { errorMessage, format } from "../../lib/messages";
+import { hasErrors } from "../../lib/validation";
 
 export function CompleteSignupForm({ token }: { token: string }) {
   const { locale, messages } = useMessages();
@@ -24,6 +27,7 @@ export function CompleteSignupForm({ token }: { token: string }) {
   const queryClient = useQueryClient();
   const [profile, setProfile] = useState(emptyProfile);
   const [error, setError] = useState<string | null>(null);
+  const [profileErrors, setProfileErrors] = useState<ProfileErrors>({});
 
   const info = useQuery({
     queryKey: ["oauth-signup", token],
@@ -40,7 +44,12 @@ export function CompleteSignupForm({ token }: { token: string }) {
       router.push("/account");
       router.refresh();
     },
-    onError: (failure) => setError(errorCode(failure))
+    onError: (failure) => {
+      const code = errorCode(failure);
+      const field = profileFieldByServerError[code];
+      if (field) setProfileErrors({ [field]: code });
+      else setError(code);
+    }
   });
 
   if (!token || info.isError) {
@@ -60,15 +69,16 @@ export function CompleteSignupForm({ token }: { token: string }) {
     event.preventDefault();
     setError(null);
     const derived = deriveProfile(profile);
-    const profileError = validateProfile(profile, derived);
-    if (profileError) return setError(profileError);
+    const nextErrors = validateProfile(profile, derived, info.data?.email);
+    setProfileErrors(nextErrors);
+    if (hasErrors(nextErrors)) return setError("formHasErrors");
     complete.mutate({ token, ...toProfilePayload(profile, derived, locale) });
   }
 
   return (
     <form className={ui.form} onSubmit={onSubmit} noValidate>
       <p className={ui.hint}>{format(messages.complete.subtitle, { email: info.data.email })}</p>
-      <ProfileFields value={profile} onChange={setProfile} />
+      <ProfileFields value={profile} onChange={setProfile} errors={profileErrors} />
       {error ? (
         <p className={ui.error} role="alert">
           {errorMessage(messages, error)}

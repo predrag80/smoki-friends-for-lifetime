@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { escapeHtml, guardianConsentMessage, verifyEmailMessage } from "./emails.js";
+import { escapeHtml, guardianConsentMessage, passwordResetMessage, verifyEmailMessage } from "./emails.js";
 
 test("untranslated locales fall back to Serbian", () => {
   const message = verifyEmailMessage("de", "a@example.com", "http://app/verify?token=x");
@@ -17,4 +17,10 @@ test("guardian email names the masked child account and escapes HTML", () => {
 
 test("escapeHtml neutralises markup", () => {
   assert.equal(escapeHtml(`<a href="x">'&'</a>`), "&lt;a href=&quot;x&quot;&gt;&#39;&amp;&#39;&lt;/a&gt;");
+});
+
+test("password reset email states how long the link is valid", () => {
+  const message = passwordResetMessage("sr", "a@example.com", "http://app/reset-password?token=x", 60);
+  assert.ok(message.text.includes("60 minuta"));
+  assert.ok(message.text.includes("http://app/reset-password?token=x"));
 });

@@ -12,6 +12,7 @@ import ui from "../components/ui.module.css";
 import { apiFetch, errorCode } from "../lib/api";
 import { errorMessage } from "../lib/messages";
 import { safeRedirect } from "../lib/redirect";
+import { validateEmailField } from "../lib/validation";
 
 type LoginFormProps = { redirect?: string; googleFailed: boolean };
 
@@ -36,7 +37,9 @@ export function LoginForm({ redirect, googleFailed }: LoginFormProps) {
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    if (!email.includes("@") || !password) return setError("required");
+    const emailError = validateEmailField(email);
+    if (emailError) return setError(emailError);
+    if (!password) return setError("passwordRequired");
     login.mutate({ email: email.trim(), password });
   }
 
@@ -75,6 +78,10 @@ export function LoginForm({ redirect, googleFailed }: LoginFormProps) {
           {login.isPending ? messages.login.submitting : messages.login.submit}
         </button>
       </form>
+
+      <p className={ui.footnote}>
+        <Link href="/forgot-password">{messages.login.forgot}</Link>
+      </p>
 
       <GoogleButton />
 

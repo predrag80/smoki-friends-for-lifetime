@@ -52,6 +52,7 @@ const envSchema = z.object({
   EMAIL_VERIFICATION_TTL_HOURS: z.coerce.number().int().positive().default(48),
   GUARDIAN_CONSENT_TTL_DAYS: z.coerce.number().int().positive().default(14),
   OAUTH_SIGNUP_TTL_MINUTES: z.coerce.number().int().positive().default(30),
+  PASSWORD_RESET_TTL_MINUTES: z.coerce.number().int().positive().default(60),
 
   // Google sign-in. Google only accepts http redirect URIs on localhost, so locally the OAuth
   // endpoints are reached through http://localhost:4100 while the session cookie is set on API_URL.

@@ -58,7 +58,17 @@ an automatically edited final "Friend for a Lifetime" film.
   Google only accepts http redirect URIs on localhost, so OAuth start/callback run on
   `OAUTH_PUBLIC_BASE_URL` (http://localhost:4100 locally) and hand over to `API_URL` with a one-time
   LOGIN_TICKET that sets the cookie. New Google users finish registration at `/register/complete`.
-- Single-use tokens (email verification, login ticket, OAuth sign-up) live in `AuthToken`, hashed.
+- Password rules (shared `checkPasswordStrength`): 8-200 characters, at least one letter and one digit,
+  not equal to the email. The API answers 422 `WEAK_PASSWORD`; forms show the specific rule inline.
+- Registration is validated twice with the same shared rules: inline per-field errors in the forms
+  (`frontend/app/lib/profile.ts`, `frontend/app/lib/validation.ts`) and zod + `evaluateRegistration`
+  on the API. Emails are trimmed and lowercased before validation.
+- Password reset: `/auth/password/forgot` always answers 202 (no account enumeration) and emails a
+  60-minute single-use link; `/auth/password/reset` sets the new password, marks the email verified,
+  ends all other sessions, emails a "password changed" notice and signs the user in.
+- Legal texts and their versions will be added later by the client; `LEGAL_*_VERSION` env values are
+  placeholders until then.
+- Single-use tokens (email verification, login ticket, OAuth sign-up, password reset) live in `AuthToken`, hashed.
   Request logs never include query strings.
 - A user can create moments only when `readiness.canCreate` is true: email verified, guardian
   confirmed when required, photo-processing consent given.
