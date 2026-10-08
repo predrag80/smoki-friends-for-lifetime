@@ -52,11 +52,31 @@ jobs:
           SSH_KEY: ${{ secrets.HETZNER_SSH_KEY }}
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          # Normalise line endings and make sure the key ends with a newline.
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -T 15 "$HETZNER_HOST" >> ~/.ssh/known_hosts
-          printf 'Host server\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n' \
-            "$HETZNER_HOST" "$DEPLOY_USER" > ~/.ssh/config
+          if ! head -1 ~/.ssh/deploy_key | grep -q -- '-----BEGIN'; then
+            echo "::error::HETZNER_SSH_KEY must be the PRIVATE key (content of ~/.ssh/sffl_deploy, starting with -----BEGIN OPENSSH PRIVATE KEY-----)."
+            exit 1
+          fi
+          # Fingerprint only (not secret): compare with `ssh-keygen -lf ~/.ssh/sffl_deploy.pub` locally.
+          echo "::notice::Deploy key fingerprint: $(ssh-keygen -y -f ~/.ssh/deploy_key | ssh-keygen -lf - | awk '{print $2}')"
+          HOST="$(printf '%s' "$HETZNER_HOST" | tr -d '[:space:]')"
+          printf 'Host server\n  HostName %s\n  User %s\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n  BatchMode yes\n  StrictHostKeyChecking accept-new\n  ConnectTimeout 20\n  ServerAliveInterval 30\n' \
+            "$HOST" "$DEPLOY_USER" > ~/.ssh/config
+
+      - name: Test SSH connection
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          if ! ssh server 'echo "Connected as $(whoami) to $(hostname)"; docker --version'; then
+            echo "::group::SSH debug output"
+            DEBUG="$(ssh -vv server true 2>&1 | grep -E "Connecting to|Connection (established|refused|timed out)|Offering|Authenticated|Permission denied|No route|Host key" | sed 's/^debug[0-9]*: //' | tr '\n' ' ' | cut -c1-900)"
+            echo "$DEBUG"
+            echo "::endgroup::"
+            echo "::warning::SSH debug: $DEBUG"
+            echo "::error::SSH to $DEPLOY_USER@HETZNER_HOST failed. Check the HETZNER_HOST variable and that HETZNER_SSH_KEY matches ~/.ssh/sffl_deploy."
+            exit 1
+          fi
 
       - name: Upload code
         if: steps.config.outputs.ready == 'true'
