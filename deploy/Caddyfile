@@ -1,0 +1,18 @@
+# HTTPS certificates are issued and renewed automatically (Let's Encrypt / ZeroSSL).
+
+{$APP_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy frontend:3100
+}
+
+{$API_DOMAIN} {
+	encode zstd gzip
+	request_body {
+		max_size 20MB
+	}
+	reverse_proxy backend:4100
+}
+
+{$MAIL_DOMAIN} {
+	reverse_proxy mailpit:8025
+}

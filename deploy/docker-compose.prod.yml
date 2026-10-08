@@ -1,0 +1,189 @@
+# Server stack (Hetzner). Run from the repository root:
+#   docker compose -f deploy/docker-compose.prod.yml --env-file /opt/sffl/.env.production up -d
+# /opt/sffl/.env.production is generated once on the server by deploy/hetzner/init-env.sh.
+name: sffl
+
+x-backend-env: &backend-env
+  NODE_ENV: production
+  HOST: 0.0.0.0
+  PORT: "4100"
+  WORKER_HEALTH_PORT: "4101"
+  APP_URL: https://${APP_DOMAIN}
+  API_URL: https://${API_DOMAIN}
+  OAUTH_PUBLIC_BASE_URL: https://${API_DOMAIN}
+  CORS_ORIGINS: https://${APP_DOMAIN}
+  DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+  VALKEY_URL: redis://valkey:6379
+  SESSION_COOKIE_NAME: sffl_session
+  SESSION_COOKIE_DOMAIN: .${APP_DOMAIN}
+  SESSION_COOKIE_SECURE: "true"
+  SESSION_COOKIE_SAME_SITE: Lax
+  STORAGE_ENDPOINT: http://storage:9000
+  STORAGE_REGION: us-east-1
+  STORAGE_BUCKET: sffl-private
+  STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY}
+  STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_KEY}
+  STORAGE_FORCE_PATH_STYLE: "true"
+  SMTP_HOST: ${SMTP_HOST:-mailpit}
+  SMTP_PORT: ${SMTP_PORT:-1025}
+  SMTP_SECURE: ${SMTP_SECURE:-false}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASS: ${SMTP_PASS:-}
+  MAIL_FROM: ${MAIL_FROM}
+  GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID:-}
+  GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET:-}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  TZ: UTC
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    volumes:
+      - valkey_data:/data
+
+  storage-perms:
+    image: alpine:3
+    command: chown -R 10001:10001 /data
+    volumes:
+      - storage_data:/data
+    restart: "no"
+
+  storage:
+    image: rustfs/rustfs:1.0.0
+    restart: unless-stopped
+    depends_on:
+      storage-perms:
+        condition: service_completed_successfully
+    environment:
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: 0.0.0.0:9000
+      RUSTFS_CONSOLE_ENABLE: "false"
+      RUSTFS_ACCESS_KEY: ${STORAGE_ACCESS_KEY}
+      RUSTFS_SECRET_KEY: ${STORAGE_SECRET_KEY}
+    volumes:
+      - storage_data:/data
+
+  storage-init:
+    image: amazon/aws-cli:latest
+    depends_on:
+      - storage
+    environment:
+      AWS_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY: ${STORAGE_SECRET_KEY}
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        for i in $$(seq 1 30); do
+          aws --endpoint-url http://storage:9000 s3api list-buckets >/dev/null 2>&1 && break
+          sleep 2
+        done
+        aws --endpoint-url http://storage:9000 s3api head-bucket --bucket sffl-private 2>/dev/null \
+          || aws --endpoint-url http://storage:9000 s3api create-bucket --bucket sffl-private
+    restart: "no"
+
+  # Dev-server inbox until a real SMTP account exists; UI at https://${MAIL_DOMAIN} (password protected).
+  mailpit:
+    image: axllent/mailpit:latest
+    restart: unless-stopped
+    environment:
+      MP_UI_AUTH: ${MAILPIT_UI_AUTH}
+      MP_MAX_MESSAGES: "2000"
+    volumes:
+      - mailpit_data:/data
+
+  backend:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    image: sffl-backend:latest
+    restart: unless-stopped
+    environment:
+      <<: *backend-env
+      PROCESS_ROLE: api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_started
+
+  worker:
+    image: sffl-backend:latest
+    restart: unless-stopped
+    command: ["node", "dist/worker.js"]
+    environment:
+      <<: *backend-env
+      PROCESS_ROLE: worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_started
+
+  # One-off: database migrations and idempotent seed (run by the deploy workflow).
+  migrate:
+    image: sffl-backend:latest
+    profiles: ["tools"]
+    command: ["sh", "-c", "npx prisma migrate deploy && npx tsx src/scripts/seed.ts"]
+    environment:
+      <<: *backend-env
+      PROCESS_ROLE: worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: https://${API_DOMAIN}
+        NEXT_PUBLIC_APP_URL: https://${APP_DOMAIN}
+    image: sffl-frontend:latest
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+      MAIL_DOMAIN: ${MAIL_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+      - mailpit
+
+volumes:
+  postgres_data:
+  valkey_data:
+  storage_data:
+  mailpit_data:
+  caddy_data:
+  caddy_config:

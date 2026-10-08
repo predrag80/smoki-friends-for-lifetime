@@ -91,6 +91,14 @@ an automatically edited final "Friend for a Lifetime" film.
 - Do not run `npm run build` while dev servers are running; use dev servers for iteration.
 - Git commits carry no AI attribution lines.
 
+## Deployment
+- Dev server: Hetzner, domains `smoki-dev.prowebsystems.rs` (app), `api.smoki-dev.prowebsystems.rs` (API),
+  `mail.smoki-dev.prowebsystems.rs` (Mailpit); DNS A records at Unlimited (cPanel zone editor).
+- Push to `main` → CI → `deploy.yml` (rsync + docker compose on the server). Details in `deploy/README.md`.
+- Server secrets live only in `/opt/sffl/.env.production`, generated on the server; GitHub holds only the
+  deploy SSH key (`HETZNER_SSH_KEY`) and the server address (`HETZNER_HOST` variable).
+- Caddy terminates HTTPS; postgres, valkey and storage are not exposed outside the Docker network.
+
 ## Workflow (project skills in `.claude/skills/`)
 - `implement-feature`: plan first, get the user's approval, then implement, document, verify and commit.
 - `add-api-endpoint`: Fastify module layout, zod validation, error codes, service tests.
@@ -109,7 +117,8 @@ an automatically edited final "Friend for a Lifetime" film.
 6. "Moja Smoki priča" — film strip with three periods, final montage job.
 7. Sharing + return — export, share links/landing for friends, meaningful reminders.
 8. Admin + analytics — success rate, limits, cost per generation, funnel.
-9. Deployment — Dockerfiles, infrastructure, load test before 2027-01-01 launch.
+9. Deployment — dev server on Hetzner with automatic deploy from `main` (see `deploy/README.md`);
+   production infrastructure and load test before the 2027-01-01 launch.
 
 ## Open Decisions (from the proposal)
 - Film length and format; final montage length.
