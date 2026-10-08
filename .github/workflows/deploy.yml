@@ -111,11 +111,21 @@ jobs:
       - name: Check health
         if: steps.config.outputs.ready == 'true'
         run: |
+          COMPOSE="docker compose -f $DEPLOY_PATH/deploy/docker-compose.prod.yml --env-file /opt/sffl/.env.production"
           for i in $(seq 1 20); do
-            if ssh server "docker compose -f $DEPLOY_PATH/deploy/docker-compose.prod.yml --env-file /opt/sffl/.env.production exec -T backend wget -qO- http://localhost:4100/health"; then
-              echo; echo "API is healthy"; exit 0
+            # 127.0.0.1, not localhost: in Alpine "localhost" may resolve to ::1 while the API listens on IPv4.
+            if HEALTH="$(ssh server "$COMPOSE exec -T backend wget -qO- http://127.0.0.1:4100/health" 2>/dev/null)"; then
+              echo "$HEALTH"
+              echo "::notice::API is healthy: $HEALTH"
+              exit 0
             fi
             sleep 6
           done
+          STATUS="$(ssh server "$COMPOSE ps --format '{{.Service}}={{.State}}'" | tr '\n' ' ')"
+          HEALTH="$(ssh server "$COMPOSE exec -T backend wget -S -O- http://127.0.0.1:4100/health" 2>&1 | tail -5 | tr '\n' ' ' | cut -c1-600)"
+          LOGS="$(ssh server "$COMPOSE logs --tail 15 --no-color backend" 2>&1 | tail -15 | tr '\n' ' ' | cut -c1-1500)"
+          echo "::warning::Services: $STATUS"
+          echo "::warning::Health response: $HEALTH"
+          echo "::warning::Backend logs: $LOGS"
           echo "::error::API health check failed"
           exit 1
