@@ -47,7 +47,23 @@ an automatically edited final "Friend for a Lifetime" film.
     SOMEDAY (current+10)..85. A period is unavailable if its range would be empty.
   - Scene catalog v1 (15 scenes) with per-scene min/max age; the DB is seeded from it
     (`npm run db:seed -w @sffl/backend`).
-- Only the birth year is stored (not full date of birth); current age is derived from it.
+- Only month and year of birth are stored (not the full date); age is derived with `getAge`, which
+  treats the birth month as "birthday not yet passed" (conservative for every age gate).
+- Minimum user age is 12. Users below the market's digital consent age need a parent/guardian
+  confirmation (email link) before they can upload photos. `digitalConsentAgeByMarket` in
+  `packages/shared/src/domain/age.ts` holds TEMPORARY values (SRB 15, BIH 16, HRV 16, MKD 14, AUT 14)
+  that the client's legal team must confirm. Marketing consent is offered from 18.
+- Auth: email + password (scrypt) and Google (OAuth code flow with PKCE). Sessions are DB rows with a
+  hashed token in an HttpOnly cookie shared by `app.` and `api.` (`SESSION_COOKIE_DOMAIN`).
+  Google only accepts http redirect URIs on localhost, so OAuth start/callback run on
+  `OAUTH_PUBLIC_BASE_URL` (http://localhost:4100 locally) and hand over to `API_URL` with a one-time
+  LOGIN_TICKET that sets the cookie. New Google users finish registration at `/register/complete`.
+- Single-use tokens (email verification, login ticket, OAuth sign-up) live in `AuthToken`, hashed.
+  Request logs never include query strings.
+- A user can create moments only when `readiness.canCreate` is true: email verified, guardian
+  confirmed when required, photo-processing consent given.
+- Account deletion anonymises the email, removes sessions/tokens/OAuth links/guardian data, revokes
+  consents and sets `deletedAt`; media purge is done by the worker in the generation phase.
 - Every stored file is a `MediaAsset` row pointing to a private storage key (source photo,
   generated photo, video, final film). One `Moment` per user per life period.
 - `GenerationJob` is the queue table (status + runAfter + lock) and the source for limits/cost analytics.
@@ -57,9 +73,11 @@ an automatically edited final "Friend for a Lifetime" film.
 ## Local Development
 - Domains: `app.smoki.local` (Next.js :3100) and `api.smoki.local` (Fastify :4100) through the local nginx
   (`dev/nginx/smoki.local.conf`); Caddy is an optional compose profile (`proxy`).
-- Services: `npm run dev:services` (Postgres, Valkey, RustFS).
+- Services: `npm run dev:services` (Postgres, Valkey, RustFS, Mailpit). All local emails land in
+  Mailpit at http://localhost:8025.
 - Ports are project-specific so this app can run alongside Smoki (3000/4000/5432):
-  frontend 3100, API 4100, worker health 4101, Postgres 5433, Valkey 6380, storage 9000/9001.
+  frontend 3100, API 4100, worker health 4101, Postgres 5433, Valkey 6380, storage 9000/9001,
+  Mailpit 1025 (SMTP) / 8025 (inbox).
 - Do not run `npm run build` while dev servers are running; use dev servers for iteration.
 - Git commits carry no AI attribution lines.
 
@@ -74,7 +92,8 @@ an automatically edited final "Friend for a Lifetime" film.
 1. Foundation setup — monorepo, skeletons, local environment, CI. (done)
 2. Domain + data — Prisma models: User, Consent, MediaAsset, Scene, SceneTranslation, Moment,
    GenerationJob, FinalFilm, ShareLink; scene catalog seed with age rules; `GET /scenes`. (done)
-3. Auth + consent — registration, session cookie, photo processing consent, age rules.
+3. Auth + consent — email/password + Google sign-in, email verification, sessions, consents,
+   guardian consent for minors, account deletion, branded home and auth screens. (done)
 4. Photo pipeline — upload to private storage, AI photo job, status polling, regenerate with limits.
 5. Video pipeline — video job from approved photo, queue/status, fallback on failure.
 6. "Moja Smoki priča" — film strip with three periods, final montage job.

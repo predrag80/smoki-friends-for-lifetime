@@ -17,7 +17,7 @@ dev/              local services (docker compose)
 
 - Node.js 22 (`nvm use`)
 - OrbStack (Docker engine + `docker compose`)
-- Free ports 3100, 4100, 4101, 5433, 6380, 9000 and 9001
+- Free ports 1025, 3100, 4100, 4101, 5433, 6380, 8025, 9000 and 9001
 
 ## Local development
 
@@ -29,7 +29,7 @@ dev/              local services (docker compose)
    cp frontend/.env.example frontend/.env.local
    ```
 
-2. Services (Postgres, Valkey, RustFS storage):
+2. Services (Postgres, Valkey, RustFS storage, Mailpit):
 
    ```sh
    npm run dev:services
@@ -58,6 +58,13 @@ dev/              local services (docker compose)
 | Postgres | 5433 |
 | Valkey | 6380 |
 | Storage (RustFS) | 9000 (S3 API), 9001 (console) |
+| Mailpit (local email) | 1025 (SMTP), 8025 (inbox) |
+
+### Google sign-in (optional)
+
+Create an OAuth client of type "Web application" in Google Cloud, add the redirect URI
+`http://localhost:4100/auth/google/callback`, and set `GOOGLE_OAUTH_CLIENT_ID` and
+`GOOGLE_OAUTH_CLIENT_SECRET` in `backend/.env`. Without them the Google button is hidden.
 
 ## Production mode locally
 
