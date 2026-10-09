@@ -17,16 +17,31 @@ function escapeXml(value: string): string {
   return value.replace(/[<>&"']/g, (char) => `&#${char.charCodeAt(0)};`);
 }
 
+const BADGE_MARGIN = 24;
+const BADGE_PADDING = 18;
+const LINE_HEIGHT = 34;
+const MAX_LINE_CHARS = 26;
+
+function fitLine(value: string): string {
+  return value.length > MAX_LINE_CHARS ? `${value.slice(0, MAX_LINE_CHARS - 1)}…` : value;
+}
+
+// Label sits in the top-right corner so the caption bar on the story screen never covers it.
 function overlay(lines: string[]): Buffer {
-  const text = lines
+  const fitted = lines.map(fitLine);
+  const longest = Math.max(...fitted.map((line) => line.length));
+  const width = Math.min(WIDTH - BADGE_MARGIN * 2, Math.max(160, Math.round(longest * 17) + BADGE_PADDING * 2));
+  const height = fitted.length * LINE_HEIGHT + BADGE_PADDING * 2 - 8;
+  const right = WIDTH - BADGE_MARGIN - BADGE_PADDING;
+  const text = fitted
     .map(
       (line, index) =>
-        `<text x="40" y="${HEIGHT - 150 + index * 44}" font-family="DejaVu Sans, Arial, sans-serif" font-size="${index === 0 ? 30 : 36}" font-weight="700" fill="${index === 0 ? "#ffd533" : "#ffffff"}">${escapeXml(line)}</text>`
+        `<text x="${right}" y="${BADGE_MARGIN + BADGE_PADDING + 22 + index * LINE_HEIGHT}" text-anchor="end" font-family="DejaVu Sans, Arial, sans-serif" font-size="${index === 0 ? 24 : 26}" font-weight="700" fill="${index === 0 ? "#ffd533" : "#ffffff"}">${escapeXml(line)}</text>`
     )
     .join("");
   return Buffer.from(
     `<svg width="${WIDTH}" height="${HEIGHT}" xmlns="http://www.w3.org/2000/svg">` +
-      `<rect x="0" y="${HEIGHT - 210}" width="${WIDTH}" height="210" fill="#7a1115" fill-opacity="0.85"/>` +
+      `<rect x="${WIDTH - BADGE_MARGIN - width}" y="${BADGE_MARGIN}" width="${width}" height="${height}" rx="12" fill="#7a1115" fill-opacity="0.85"/>` +
       text +
       `</svg>`
   );
@@ -62,8 +77,11 @@ export function createMockProvider(options: MockOptions): AiProvider {
         throw new ProviderError("MOCK_FAILURE", true, "Simulated provider failure");
       }
 
-      const base = periodLook(sharp(input.sourceImage).resize(WIDTH, HEIGHT, { fit: "cover" }), input.label.period);
-      const image = await base
+      // Tint first, then add the label, so the label keeps its own colours.
+      const tinted = await periodLook(sharp(input.sourceImage).resize(WIDTH, HEIGHT, { fit: "cover" }), input.label.period)
+        .png()
+        .toBuffer();
+      const image = await sharp(tinted)
         .composite([
           {
             input: overlay(["MOCK", input.label.sceneTitle, `${input.label.targetAge} godina`])
