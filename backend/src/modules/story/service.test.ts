@@ -36,6 +36,17 @@ test("a failed moment without a photo reports a generic error", () => {
   assert.equal(dto.error, "GENERATION_FAILED");
 });
 
+test("a refusal by the model is reported separately", () => {
+  const dto = toMomentDto({ ...row, status: "FAILED", latestJob: { status: "FAILED", errorCode: "BLOCKED" } }, options);
+  assert.equal(dto.error, "GENERATION_BLOCKED");
+});
+
+test("a failed regenerate keeps the photo and still reports the failure", () => {
+  const dto = toMomentDto({ ...row, status: "PHOTO_READY", photoAssetId: "a1", latestJob: { status: "FAILED", errorCode: "TIMEOUT" } }, options);
+  assert.equal(dto.photoUrl, "https://api.example.rs/media/a1");
+  assert.equal(dto.error, "GENERATION_FAILED");
+});
+
 test("moments are ordered yesterday, today, someday", () => {
   const sorted = sortMoments([{ period: "SOMEDAY" }, { period: "YESTERDAY" }, { period: "TODAY" }] as const satisfies { period: "SOMEDAY" | "YESTERDAY" | "TODAY" }[]);
   assert.deepEqual(sorted.map((moment) => moment.period), ["YESTERDAY", "TODAY", "SOMEDAY"]);

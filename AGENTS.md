@@ -85,8 +85,13 @@ an automatically edited final "Friend for a Lifetime" film.
 - Photo generation: `POST /moments` and `POST /moments/:id/regenerate` enqueue a PHOTO job; limit
   `GENERATIONS_PER_PERIOD_PER_DAY` (default 3) per moment in a rolling 24 h window; retries with
   backoff up to `GENERATION_MAX_ATTEMPTS`; global provider throttle `AI_REQUESTS_PER_MINUTE` in Valkey.
-  A failed regenerate keeps the previous photo. Prompts are built server-side from `Scene.aiPrompt`
-  (`buildPhotoPrompt`); users never write prompts.
+  A failed regenerate keeps the previous photo (the error is still shown); a model refusal is reported as
+  `GENERATION_BLOCKED`. Prompts are built server-side from `Scene.aiPrompt` (`buildPhotoPrompt`); users never
+  write prompts. Scene prompts are brand-free: past moments are set in their calendar year (period look),
+  companions match the target age, no third-party brands, neutral local text (e.g. a birthday banner) is
+  allowed. The Smoki package appears only when `PRODUCT_REFERENCE_IMAGE` (real packshot) is configured.
+- Image model: `gemini-nano-banana-2.1` on Vertex AI, location `global` (Nano Banana 2 /
+  `gemini-3.1-flash-image` is being retired). Proof-of-concept runner: `npm run poc:photos -w @sffl/backend`.
 - Every stored file is a `MediaAsset` row pointing to a private storage key (source photo,
   generated photo, video, final film). One `Moment` per user per life period.
 - `GenerationJob` is the queue table (status + runAfter + lock) and the source for limits/cost analytics.

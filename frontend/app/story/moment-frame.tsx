@@ -3,7 +3,7 @@
 import { getPeriodAgeRange, type LifePeriod, type MomentDto } from "@sffl/shared";
 
 import { useMessages } from "../components/messages-provider";
-import { format } from "../lib/messages";
+import { errorMessage, format } from "../lib/messages";
 import type { BuilderTarget } from "./moment-builder";
 import styles from "./story.module.css";
 
@@ -57,7 +57,7 @@ export function MomentFrame({ period, currentAge, hasPhoto, moment, onOpen }: Mo
 
         {moment && !moment.pending ? (
           <div className={styles.momentInfo}>
-            {moment.error ? <p className={styles.frameNote}>{s.failed}</p> : null}
+            {moment.error ? <p className={styles.frameNote}>{errorMessage(messages, moment.error)}</p> : null}
             <p className={styles.momentCaption}>
               <strong>
                 {moment.targetAge} {s.ageUnit}

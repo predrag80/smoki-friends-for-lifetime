@@ -41,10 +41,21 @@ export function toMomentDto(row: MomentRow, options: { apiUrl: string; locale: A
     status: row.status,
     pending,
     photoUrl: row.photoAssetId ? mediaUrl(options.apiUrl, row.photoAssetId) : null,
-    error: !pending && row.status === "FAILED" ? "GENERATION_FAILED" : null,
+    error: momentError(row, pending),
     generationsLeft: generationsLeft(row.recentJobs, options.dailyLimit),
     createdAt: row.createdAt.toISOString()
   };
+}
+
+/**
+ * Error shown on the moment: the latest generation failed (a failed regenerate keeps the previous photo).
+ * A refusal by the model gets its own code so the user can pick another scene or age.
+ */
+function momentError(row: MomentRow, pending: boolean): string | null {
+  if (pending) return null;
+  const failed = row.latestJob?.status === "FAILED" || row.status === "FAILED";
+  if (!failed) return null;
+  return row.latestJob?.errorCode === "BLOCKED" ? "GENERATION_BLOCKED" : "GENERATION_FAILED";
 }
 
 export function sortMoments<T extends { period: LifePeriod }>(moments: T[]): T[] {

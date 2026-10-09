@@ -53,6 +53,10 @@ function scenePromptFor(sceneId: string, stored: string | null): string {
   return stored ?? sceneCatalog.find((scene) => scene.id === sceneId)?.prompt ?? sceneId;
 }
 
+function productPlacementFor(sceneId: string): string | undefined {
+  return sceneCatalog.find((scene) => scene.id === sceneId)?.productPlacement;
+}
+
 export async function processPhotoJob(jobId: string, provider: AiProvider, logger: Logger): Promise<void> {
   const job = await prisma.generationJob.findUniqueOrThrow({
     where: { id: jobId },
@@ -85,7 +89,8 @@ export async function processPhotoJob(jobId: string, provider: AiProvider, logge
       period: moment.period,
       targetAge: moment.targetAge,
       currentAge: getAge({ month: moment.user.birthMonth, year: moment.user.birthYear }),
-      productReference: Boolean(productImage)
+      productReference: Boolean(productImage),
+      productPlacement: productPlacementFor(moment.sceneId)
     });
 
     const result = await provider.generatePhoto({

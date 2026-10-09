@@ -73,7 +73,8 @@ async function generate(
     period: item.period,
     targetAge: item.targetAge,
     currentAge,
-    productReference: Boolean(productImage)
+    productReference: Boolean(productImage),
+    productPlacement: item.scene.productPlacement
   });
   const base: Omit<PocAttempt, "status" | "ms" | "attempts"> = {
     id: `${item.period}-${item.targetAge}-${item.scene.id}`,
