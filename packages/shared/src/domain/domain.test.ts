@@ -56,3 +56,10 @@ test("every age a period can offer has at least one scene in every territory", (
     }
   }
 });
+
+test("every scene has an internal AI prompt that mentions Smoki", () => {
+  for (const scene of sceneCatalog) {
+    assert.ok(scene.prompt.length > 40, scene.id);
+    assert.match(scene.prompt, /Smoki/, scene.id);
+  }
+});
