@@ -27,6 +27,9 @@ Domains (defaults, override with repository variables `APP_DOMAIN`, `API_DOMAIN`
 
 Each needs an A record pointing to the server's IPv4 address.
 
+AI generation uses the mock provider unless `AI_PROVIDER=gemini` (plus the Gemini/Vertex variables)
+is set in `/opt/sffl/.env.production`.
+
 ## One-time setup
 
 1. Create a deploy key on your machine:

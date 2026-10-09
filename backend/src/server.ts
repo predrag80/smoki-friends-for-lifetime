@@ -1,5 +1,6 @@
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
+import multipart from "@fastify/multipart";
 import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
 
@@ -11,6 +12,7 @@ import { guardianRoutes } from "./modules/guardian/routes.js";
 import { healthRoutes } from "./modules/health/routes.js";
 import { meRoutes } from "./modules/me/routes.js";
 import { sceneRoutes } from "./modules/scenes/routes.js";
+import { storyRoutes } from "./modules/story/routes.js";
 
 function parseCorsOrigins(value?: string): Set<string> {
   return new Set(
@@ -41,6 +43,7 @@ export async function buildServer() {
   const allowedOrigins = parseCorsOrigins(env.CORS_ORIGINS);
 
   await app.register(cookie);
+  await app.register(multipart, { limits: { fileSize: env.PHOTO_MAX_BYTES, files: 1, fields: 5 } });
 
   await app.register(cors, {
     credentials: true,
@@ -70,6 +73,7 @@ export async function buildServer() {
   await app.register(authRoutes);
   await app.register(guardianRoutes);
   await app.register(meRoutes);
+  await app.register(storyRoutes);
 
   app.addHook("onClose", async () => {
     await prisma.$disconnect();

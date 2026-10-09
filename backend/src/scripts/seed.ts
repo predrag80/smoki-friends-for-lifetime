@@ -17,13 +17,15 @@ async function seedScenes() {
         territory: scene.territory,
         sortOrder: scene.sortOrder,
         minAge: scene.minAge,
-        maxAge: scene.maxAge
+        maxAge: scene.maxAge,
+        aiPrompt: scene.prompt
       },
       update: {
         territory: scene.territory,
         sortOrder: scene.sortOrder,
         minAge: scene.minAge,
-        maxAge: scene.maxAge
+        maxAge: scene.maxAge,
+        aiPrompt: scene.prompt
       }
     });
 

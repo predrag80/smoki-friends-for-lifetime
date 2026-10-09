@@ -31,6 +31,9 @@ STORAGE_SECRET_KEY=$(openssl rand -hex 24)
 MAILPIT_UI_AUTH=admin:$(openssl rand -hex 12)
 MAIL_FROM="Smoki Friend for a Lifetime <no-reply@${APP_DOMAIN}>"
 
+# AI generation (mock until a provider is chosen)
+AI_PROVIDER=mock
+
 # Optional
 SMTP_HOST=
 SMTP_PORT=

@@ -5,12 +5,14 @@ import { createServer } from "node:http";
 import { getEnv } from "./config/env.js";
 import { prisma } from "./lib/prisma.js";
 import { closeRedisClient, connectRedisClient } from "./lib/redis.js";
+import { startGenerationWorker } from "./modules/generation/worker-loop.js";
 
-/**
- * Background worker for long-running jobs (AI photo, AI video, final film montage).
- * Job processors are registered in the generation phase; for now the worker only
- * verifies its dependencies and exposes a health endpoint.
- */
+const logger = {
+  info: (payload: object, message?: string) => console.log(message ?? "", JSON.stringify(payload)),
+  error: (payload: object, message?: string) => console.error(message ?? "", payload)
+};
+
+/** Background worker: AI photo jobs (video and final film come later) and account purging. */
 async function start() {
   const env = getEnv();
 
@@ -26,6 +28,8 @@ async function start() {
   }
 
   await redis?.ping();
+
+  const stopGeneration = startGenerationWorker(logger);
 
   const healthServer = createServer((request, response) => {
     if (request.url === "/health") {
@@ -43,6 +47,7 @@ async function start() {
   const shutdown = async (signal: string) => {
     console.log(`Worker shutting down (${signal})`);
     healthServer.close();
+    await stopGeneration();
     await prisma.$disconnect();
     await closeRedisClient();
     process.exit(0);

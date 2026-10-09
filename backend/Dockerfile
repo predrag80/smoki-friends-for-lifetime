@@ -1,6 +1,7 @@
 # Backend image for the API and the worker (build context: repository root).
 FROM node:22-alpine
-RUN apk add --no-cache openssl
+# openssl for Prisma; fonts for text in generated placeholder images (mock provider)
+RUN apk add --no-cache openssl fontconfig font-dejavu
 WORKDIR /app
 
 COPY package.json package-lock.json ./

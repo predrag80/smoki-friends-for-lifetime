@@ -66,7 +66,31 @@ const envSchema = z.object({
   LEGAL_PHOTO_PROCESSING_VERSION: z.string().default("draft-2026-10"),
   LEGAL_MARKETING_VERSION: z.string().default("draft-2026-10"),
 
-  GEMINI_API_KEY: optionalString
+  // Photos and AI generation
+  PHOTO_MAX_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024),
+  PHOTO_MIN_DIMENSION: z.coerce.number().int().positive().default(512),
+  GENERATIONS_PER_PERIOD_PER_DAY: z.coerce.number().int().positive().default(3),
+  GENERATION_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
+  GENERATION_TIMEOUT_MS: z.coerce.number().int().positive().default(120000),
+  AI_REQUESTS_PER_MINUTE: z.coerce.number().int().positive().default(30),
+  WORKER_CONCURRENCY: z.coerce.number().int().positive().default(2),
+  JOB_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(2000),
+  JOB_STALE_MINUTES: z.coerce.number().int().positive().default(15),
+  ACCOUNT_PURGE_INTERVAL_MINUTES: z.coerce.number().int().positive().default(10),
+
+  /** mock: no API calls, placeholder images; gemini: Gemini API or Vertex AI (GEMINI_USE_VERTEX). */
+  AI_PROVIDER: z.enum(["mock", "gemini"]).default("mock"),
+  MOCK_GENERATION_DELAY_MS: z.coerce.number().int().min(0).default(4000),
+  MOCK_FAILURE_RATE: z.coerce.number().min(0).max(1).default(0),
+  MOCK_FACE_CHECK: z.enum(["pass", "reject"]).default("pass"),
+
+  GEMINI_API_KEY: optionalString,
+  GEMINI_USE_VERTEX: booleanFromEnv(false),
+  GOOGLE_CLOUD_PROJECT: optionalString,
+  GOOGLE_CLOUD_LOCATION: z.string().default("europe-west1"),
+  GEMINI_IMAGE_MODEL: z.string().default("gemini-3.1-flash-image"),
+  GEMINI_CHECK_MODEL: z.string().default("gemini-2.5-flash"),
+  GEMINI_IMAGE_ASPECT_RATIO: z.string().default("3:4")
 });
 
 export type Env = z.infer<typeof envSchema>;

@@ -6,7 +6,7 @@
   "scripts": {
     "predev": "npm run build -w @sffl/shared",
     "dev": "tsx watch src/index.ts",
-    "dev:worker": "tsx watch src/worker.ts",
+    "dev:worker": "PROCESS_ROLE=worker tsx watch src/worker.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "start:worker": "node dist/worker.js",
@@ -20,15 +20,19 @@
     "db:seed": "tsx src/scripts/seed.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1054.0",
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.2.0",
+    "@fastify/multipart": "^10.0.0",
     "@fastify/rate-limit": "^10.3.0",
+    "@google/genai": "^1.50.1",
     "@prisma/client": "^6.0.0",
     "@sffl/shared": "0.1.0",
     "dotenv": "^17.3.1",
     "fastify": "^5.7.4",
     "ioredis": "^5.11.0",
     "nodemailer": "^8.0.3",
+    "sharp": "^0.35.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {
