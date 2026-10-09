@@ -31,6 +31,13 @@ export function interpretFaceCheck(answer: FaceCheckAnswer): FaceCheckResult {
   return { ok: true };
 }
 
+const SAFETY_FINISH_REASONS = ["SAFETY", "PROHIBITED", "BLOCKLIST", "SPII", "RECITATION"];
+
+/** Finish reasons such as IMAGE_SAFETY or PROHIBITED_CONTENT mean the provider refused the request. */
+export function isSafetyStop(finishReason: string): boolean {
+  return SAFETY_FINISH_REASONS.some((marker) => finishReason.includes(marker));
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
@@ -95,7 +102,12 @@ export function createGeminiProvider(env: Env): AiProvider {
         }
       }
 
-      throw new ProviderError("NO_IMAGE", true, "The model returned no image");
+      // No image: a safety stop is final, anything else (empty answer, truncated output) is worth a retry.
+      const finishReason = response.candidates?.[0]?.finishReason;
+      if (finishReason && isSafetyStop(String(finishReason))) {
+        throw new ProviderError("BLOCKED", false, String(finishReason));
+      }
+      throw new ProviderError("NO_IMAGE", true, finishReason ? String(finishReason) : "The model returned no image");
     }
   };
 }

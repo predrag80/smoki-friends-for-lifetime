@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { interpretFaceCheck } from "./gemini.js";
+import { interpretFaceCheck, isSafetyStop } from "./gemini.js";
 
 const good = { isPhoto: true, faceCount: 1, clear: true, obstructed: false };
 
@@ -15,4 +15,12 @@ test("face check explains each rejection", () => {
   assert.deepEqual(interpretFaceCheck({ ...good, faceCount: 3 }), { ok: false, reason: "MULTIPLE_FACES" });
   assert.deepEqual(interpretFaceCheck({ ...good, obstructed: true }), { ok: false, reason: "FACE_OBSTRUCTED" });
   assert.deepEqual(interpretFaceCheck({ ...good, clear: false }), { ok: false, reason: "FACE_NOT_CLEAR" });
+});
+
+test("safety finish reasons are treated as a refusal", () => {
+  assert.equal(isSafetyStop("IMAGE_SAFETY"), true);
+  assert.equal(isSafetyStop("PROHIBITED_CONTENT"), true);
+  assert.equal(isSafetyStop("IMAGE_PROHIBITED_CONTENT"), true);
+  assert.equal(isSafetyStop("STOP"), false);
+  assert.equal(isSafetyStop("MAX_TOKENS"), false);
 });
