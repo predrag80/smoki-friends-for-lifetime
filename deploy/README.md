@@ -27,8 +27,35 @@ Domains (defaults, override with repository variables `APP_DOMAIN`, `API_DOMAIN`
 
 Each needs an A record pointing to the server's IPv4 address.
 
-AI generation uses the mock provider unless `AI_PROVIDER=gemini` (plus the Gemini/Vertex variables)
-is set in `/opt/sffl/.env.production`.
+## Real AI generation (Vertex AI)
+
+AI generation uses the mock provider unless `AI_PROVIDER=gemini` is set. On the server Vertex AI is
+reached with a service account:
+
+1. Google Cloud console → IAM & Admin → Service Accounts → create `sffl-dev-server` with the single role
+   **Vertex AI User** → Keys → Add key → JSON.
+2. Copy the key to the server and delete the downloaded copy:
+   ```sh
+   scp ~/Downloads/<key>.json deploy@<server>:/opt/sffl/secrets/gcp-vertex.json
+   ssh deploy@<server> 'chmod 700 /opt/sffl/secrets && chmod 600 /opt/sffl/secrets/gcp-vertex.json'
+   rm ~/Downloads/<key>.json
+   ```
+3. Add to `/opt/sffl/.env.production`:
+   ```
+   AI_PROVIDER=gemini
+   GEMINI_USE_VERTEX=true
+   GOOGLE_CLOUD_PROJECT=<project id>
+   GOOGLE_CLOUD_LOCATION=global
+   GEMINI_IMAGE_MODEL=gemini-nano-banana-2.1
+   GOOGLE_APPLICATION_CREDENTIALS=/run/secrets/sffl/gcp-vertex.json
+   AI_ALLOWED_EMAILS=<comma-separated test accounts>
+   AI_DAILY_CAP=100
+   ```
+`/opt/sffl/secrets` is mounted read-only at `/run/secrets/sffl` in the backend, worker and migrate
+containers. The backend refuses to start when the key file or project is missing. `AI_ALLOWED_EMAILS`
+limits AI to test accounts (the dev server is public and Google sign-in verifies email instantly);
+`AI_DAILY_CAP` caps photo generations per 24 h for the whole server. Rotate the key by creating a new
+one, replacing the file, redeploying and deleting the old key in the console.
 
 ## One-time setup
 

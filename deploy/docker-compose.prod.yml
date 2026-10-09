@@ -3,6 +3,9 @@
 # /opt/sffl/.env.production is generated once on the server by deploy/hetzner/init-env.sh.
 name: sffl
 
+# Server-only secrets (Vertex AI service-account key, packshot) live in /opt/sffl/secrets, mounted read-only.
+x-secrets-volume: &secrets-volume /opt/sffl/secrets:/run/secrets/sffl:ro
+
 x-backend-env: &backend-env
   NODE_ENV: production
   HOST: 0.0.0.0
@@ -43,6 +46,9 @@ x-backend-env: &backend-env
   GOOGLE_CLOUD_LOCATION: ${GOOGLE_CLOUD_LOCATION:-global}
   GEMINI_IMAGE_MODEL: ${GEMINI_IMAGE_MODEL:-gemini-nano-banana-2.1}
   PRODUCT_REFERENCE_IMAGE: ${PRODUCT_REFERENCE_IMAGE:-}
+  GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_APPLICATION_CREDENTIALS:-}
+  AI_ALLOWED_EMAILS: ${AI_ALLOWED_EMAILS:-}
+  AI_DAILY_CAP: ${AI_DAILY_CAP:-0}
   TZ: UTC
 
 services:
@@ -127,6 +133,8 @@ services:
     environment:
       <<: *backend-env
       PROCESS_ROLE: api
+    volumes:
+      - *secrets-volume
     depends_on:
       postgres:
         condition: service_healthy
@@ -140,6 +148,8 @@ services:
     environment:
       <<: *backend-env
       PROCESS_ROLE: worker
+    volumes:
+      - *secrets-volume
     depends_on:
       postgres:
         condition: service_healthy
@@ -154,6 +164,8 @@ services:
     environment:
       <<: *backend-env
       PROCESS_ROLE: worker
+    volumes:
+      - *secrets-volume
     depends_on:
       postgres:
         condition: service_healthy

@@ -28,7 +28,9 @@ export const storyErrorCodes = [
   "MOMENT_EXISTS",
   "GENERATION_IN_PROGRESS",
   "DAILY_LIMIT_REACHED",
-  "FACE_CHECK_UNAVAILABLE"
+  "FACE_CHECK_UNAVAILABLE",
+  "AI_NOT_ALLOWED",
+  "AI_DAILY_CAP_REACHED"
 ] as const;
 export type StoryErrorCode = (typeof storyErrorCodes)[number];
 

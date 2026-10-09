@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { z } from "zod";
 
 const emptyAsUndefined = (value: unknown) =>
@@ -92,7 +93,13 @@ const envSchema = z.object({
   GEMINI_CHECK_MODEL: z.string().default("gemini-2.5-flash"),
   GEMINI_IMAGE_ASPECT_RATIO: z.string().default("3:4"),
   /** Optional packshot of the real Smoki package; sent to the image model as a second reference. */
-  PRODUCT_REFERENCE_IMAGE: z.string().optional()
+  PRODUCT_REFERENCE_IMAGE: z.string().optional(),
+  /** Comma-separated accounts allowed to use AI (empty = everyone). For the public dev server. */
+  AI_ALLOWED_EMAILS: z.string().optional(),
+  /** Photo generations per rolling 24 h for the whole server (0 = no cap). */
+  AI_DAILY_CAP: z.coerce.number().int().nonnegative().default(0),
+  /** Service-account key for Vertex AI on servers; read by the Google SDK. */
+  GOOGLE_APPLICATION_CREDENTIALS: z.string().optional()
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -111,7 +118,26 @@ export function parseEnv(source: NodeJS.ProcessEnv): Env {
     throw new Error("CORS_ORIGINS must be set in production.");
   }
 
+  const aiIssue = checkAiConfig(result.data);
+  if (aiIssue) throw new Error(`Invalid AI configuration: ${aiIssue}`);
+
   return result.data;
+}
+
+/** Fails fast at start-up instead of on the first generation. */
+export function checkAiConfig(
+  env: Pick<Env, "AI_PROVIDER" | "GEMINI_USE_VERTEX" | "GOOGLE_CLOUD_PROJECT" | "GEMINI_API_KEY" | "GOOGLE_APPLICATION_CREDENTIALS">,
+  fileExists: (path: string) => boolean = existsSync
+): string | null {
+  if (env.AI_PROVIDER !== "gemini") return null;
+  if (env.GEMINI_USE_VERTEX) {
+    if (!env.GOOGLE_CLOUD_PROJECT) return "GOOGLE_CLOUD_PROJECT is required with GEMINI_USE_VERTEX=true";
+    if (env.GOOGLE_APPLICATION_CREDENTIALS && !fileExists(env.GOOGLE_APPLICATION_CREDENTIALS)) {
+      return `GOOGLE_APPLICATION_CREDENTIALS file not found: ${env.GOOGLE_APPLICATION_CREDENTIALS}`;
+    }
+    return null;
+  }
+  return env.GEMINI_API_KEY ? null : "GEMINI_API_KEY is required unless GEMINI_USE_VERTEX=true";
 }
 
 /** Public base URL of the OAuth endpoints (start + callback). */

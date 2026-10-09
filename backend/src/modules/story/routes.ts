@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import {
   createMomentRequestSchema,
+  GENERATION_WINDOW_MS,
   getAge,
   regenerateMomentRequestSchema,
   type StoryResponse
@@ -16,6 +17,7 @@ import { acquireProviderSlot } from "../../lib/provider-gate.js";
 import { getObject, mediaKey, putObject } from "../../lib/storage.js";
 import { loadMe } from "../auth/load-me.js";
 import { getUserId, requireUser } from "../auth/require-user.js";
+import { isDailyCapReached, isEmailAllowed, parseAllowedEmails } from "../generation/guard.js";
 import { countRecentPhotoJobs } from "../generation/jobs.js";
 import { getAiProvider } from "../generation/providers/index.js";
 import { checkMomentChoice } from "../generation/rules.js";
@@ -37,6 +39,26 @@ async function loadUser(userId: string) {
     where: { id: userId },
     select: { birthMonth: true, birthYear: true, locale: true }
   });
+}
+
+/** Allow-list and server-wide daily cap for real AI generation (see AI_ALLOWED_EMAILS / AI_DAILY_CAP). */
+async function aiGuard(
+  userId: string,
+  options: { checkCap: boolean }
+): Promise<{ status: 403 | 429; code: "AI_NOT_ALLOWED" | "AI_DAILY_CAP_REACHED" } | null> {
+  const env = getEnv();
+  const allowed = parseAllowedEmails(env.AI_ALLOWED_EMAILS);
+  if (allowed.length > 0) {
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    if (!user || !isEmailAllowed(user.email, allowed)) return { status: 403, code: "AI_NOT_ALLOWED" };
+  }
+  if (options.checkCap && env.AI_DAILY_CAP > 0) {
+    const generated = await prisma.generationJob.count({
+      where: { type: "PHOTO", createdAt: { gt: new Date(Date.now() - GENERATION_WINDOW_MS) } }
+    });
+    if (isDailyCapReached(generated, env.AI_DAILY_CAP)) return { status: 429, code: "AI_DAILY_CAP_REACHED" };
+  }
+  return null;
 }
 
 export async function storyRoutes(app: FastifyInstance) {
@@ -83,6 +105,8 @@ export async function storyRoutes(app: FastifyInstance) {
     const env = getEnv();
     const userId = getUserId(request);
     if (!(await loadMe(userId)).readiness.canCreate) return fail(reply, 403, "NOT_READY");
+    const guard = await aiGuard(userId, { checkCap: false });
+    if (guard) return fail(reply, guard.status, guard.code);
 
     const file = await request.file();
     if (!file) return fail(reply, 400, "PHOTO_MISSING");
@@ -138,6 +162,8 @@ export async function storyRoutes(app: FastifyInstance) {
     const env = getEnv();
     const userId = getUserId(request);
     if (!(await loadMe(userId)).readiness.canCreate) return fail(reply, 403, "NOT_READY");
+    const guard = await aiGuard(userId, { checkCap: true });
+    if (guard) return fail(reply, guard.status, guard.code);
 
     const [user, photo, scene] = await Promise.all([
       loadUser(userId),
@@ -198,6 +224,8 @@ export async function storyRoutes(app: FastifyInstance) {
     if ((await countRecentPhotoJobs(moment.id)) >= env.GENERATIONS_PER_PERIOD_PER_DAY) {
       return fail(reply, 429, "DAILY_LIMIT_REACHED");
     }
+    const guard = await aiGuard(userId, { checkCap: true });
+    if (guard) return fail(reply, guard.status, guard.code);
 
     const targetAge = parsed.data.targetAge ?? moment.targetAge;
     const sceneId = parsed.data.sceneId ?? moment.sceneId;

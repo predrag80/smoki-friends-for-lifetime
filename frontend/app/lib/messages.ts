@@ -257,6 +257,8 @@ const sr = {
     DAILY_LIMIT_REACHED: "Za danas si iskoristio/la sve pokušaje za ovaj trenutak.",
     FACE_CHECK_UNAVAILABLE: "Provera fotografije trenutno nije dostupna. Pokušaj za minut.",
     GENERATION_FAILED: "Fotografija ovaj put nije uspela. Probaj ponovo.",
+    AI_NOT_ALLOWED: "Pravljenje fotografija je trenutno dostupno samo test korisnicima.",
+    AI_DAILY_CAP_REACHED: "Danas je napravljeno mnogo fotografija. Probaj ponovo sutra.",
     GENERATION_BLOCKED: "Ovu kombinaciju nismo mogli da napravimo. Probaj drugu scenu ili uzrast.",
     PHOTO_MISSING: "Izaberi fotografiju.",
     PHOTO_TOO_LARGE: "Fotografija je veća od 10 MB.",
