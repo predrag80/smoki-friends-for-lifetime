@@ -4,10 +4,13 @@ import type { Env } from "../../../config/env.js";
 import { ProviderError, type AiProvider, type FaceCheckResult } from "./types.js";
 
 const FACE_CHECK_PROMPT =
-  "You check a selfie that will be used to generate realistic portraits of the same person. " +
-  "Count human faces. Decide whether the main face is sharp, well lit and looking roughly towards the camera, " +
-  "and whether it is covered (sunglasses, mask, hand, heavy filter). Decide whether this is a real photograph " +
-  "(not a drawing, screenshot of text or meme). Do not identify the person.";
+  "You check a photo that will be used to generate realistic portraits of the same person. Be lenient: reject only clear problems. " +
+  "faceCount: number of clearly visible faces in the foreground; ignore small, distant or blurred faces in the background, posters and screens. " +
+  "clear: false only if the main face is so blurred, dark, tiny or turned away that its features cannot be recognised; ordinary selfies, " +
+  "phone photos and imperfect light are clear. " +
+  "obstructed: true only if sunglasses, a mask, a hand or an object hides the eyes or most of the face; ordinary glasses, beards, hats and hair are fine. " +
+  "isPhoto: false only for drawings, cartoons, screenshots of text or heavily stylised images; photos with mild filters are photos. " +
+  "Do not identify the person.";
 
 const faceCheckSchema = {
   type: Type.OBJECT,
@@ -21,6 +24,26 @@ const faceCheckSchema = {
 };
 
 type FaceCheckAnswer = { isPhoto: boolean; faceCount: number; clear: boolean; obstructed: boolean };
+
+/** Parses the model's JSON answer; an empty or incomplete answer means the model declined to look at the photo. */
+export function parseFaceCheckAnswer(text: string | undefined): FaceCheckAnswer {
+  if (!text?.trim()) throw new ProviderError("FACE_CHECK_REFUSED", false, "Empty face check answer");
+  let answer: Partial<FaceCheckAnswer>;
+  try {
+    answer = JSON.parse(text) as Partial<FaceCheckAnswer>;
+  } catch {
+    throw new ProviderError("FACE_CHECK_INVALID_RESPONSE", true);
+  }
+  if (
+    typeof answer.isPhoto !== "boolean" ||
+    typeof answer.faceCount !== "number" ||
+    typeof answer.clear !== "boolean" ||
+    typeof answer.obstructed !== "boolean"
+  ) {
+    throw new ProviderError("FACE_CHECK_INVALID_RESPONSE", true);
+  }
+  return answer as FaceCheckAnswer;
+}
 
 export function interpretFaceCheck(answer: FaceCheckAnswer): FaceCheckResult {
   if (!answer.isPhoto) return { ok: false, reason: "NOT_A_PHOTO" };
@@ -92,11 +115,14 @@ export function createGeminiProvider(env: Env): AiProvider {
         }),
         30000
       );
-      try {
-        return interpretFaceCheck(JSON.parse(response.text ?? "{}") as FaceCheckAnswer);
-      } catch {
-        throw new ProviderError("FACE_CHECK_INVALID_RESPONSE", true);
+      if (response.promptFeedback?.blockReason) {
+        throw new ProviderError("FACE_CHECK_REFUSED", false, String(response.promptFeedback.blockReason));
       }
+      const finishReason = response.candidates?.[0]?.finishReason;
+      if (finishReason && isSafetyStop(String(finishReason))) {
+        throw new ProviderError("FACE_CHECK_REFUSED", false, String(finishReason));
+      }
+      return interpretFaceCheck(parseFaceCheckAnswer(response.text));
     },
 
     async generatePhoto(input) {

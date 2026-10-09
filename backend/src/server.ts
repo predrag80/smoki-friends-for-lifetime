@@ -65,7 +65,13 @@ export async function buildServer() {
     timeWindow: 60 * 1000,
     redis: redis ?? undefined,
     skipOnError: Boolean(redis),
-    nameSpace: "sffl-rate-limit-"
+    nameSpace: "sffl-rate-limit-",
+    // Same error shape as the rest of the API so the app can show a clear message.
+    errorResponseBuilder: (_request, context) => ({
+      statusCode: context.statusCode,
+      error: "RATE_LIMITED",
+      message: `Too many requests, retry in ${context.after}`
+    })
   });
 
   await app.register(healthRoutes);

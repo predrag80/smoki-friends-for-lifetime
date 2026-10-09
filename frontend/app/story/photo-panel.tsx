@@ -11,6 +11,32 @@ import { errorMessage } from "../lib/messages";
 import styles from "./story.module.css";
 
 const MAX_BYTES = 10 * 1024 * 1024;
+/** Longest side sent to the server; the server keeps at most 1600 px anyway, so nothing is lost. */
+const UPLOAD_MAX_SIDE = 1600;
+
+/**
+ * Shrinks phone photos (often 3–10 MB) to a ~0.3–0.6 MB JPEG before upload, so slow mobile connections
+ * do not stall. Falls back to the original file when the browser cannot decode it.
+ */
+async function shrinkForUpload(file: File): Promise<Blob> {
+  try {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    const scale = Math.min(1, UPLOAD_MAX_SIDE / Math.max(bitmap.width, bitmap.height));
+    if (scale === 1 && file.size < 1.5 * 1024 * 1024) {
+      bitmap.close();
+      return file;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+    return blob ?? file;
+  } catch {
+    return file;
+  }
+}
 
 export function PhotoPanel({ photo }: { photo: { id: string; url: string } | null }) {
   const { messages } = useMessages();
@@ -20,9 +46,9 @@ export function PhotoPanel({ photo }: { photo: { id: string; url: string } | nul
   const [error, setError] = useState<string | null>(null);
 
   const upload = useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: async (file: File) => {
       const form = new FormData();
-      form.append("photo", file);
+      form.append("photo", await shrinkForUpload(file), "photo.jpg");
       return apiFetch<PhotoUploadResponse>("/photos", { method: "POST", form });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["story"] }),

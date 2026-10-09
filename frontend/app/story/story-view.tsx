@@ -63,7 +63,13 @@ export function StoryView() {
           </section>
         ) : null}
 
-        {story.data?.canCreate ? (
+        {story.data?.canCreate && !story.data.aiAllowed ? (
+          <section className={styles.card}>
+            <p>{s.aiNotAllowed}</p>
+          </section>
+        ) : null}
+
+        {story.data?.canCreate && story.data.aiAllowed ? (
           <>
             <PhotoPanel photo={story.data.sourcePhoto} />
             <section aria-label={s.stripLabel} className={styles.strip}>

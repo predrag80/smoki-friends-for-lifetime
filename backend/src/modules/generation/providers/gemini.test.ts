@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { classifyApiStatus, interpretFaceCheck, isSafetyStop } from "./gemini.js";
+import { classifyApiStatus, interpretFaceCheck, isSafetyStop, parseFaceCheckAnswer } from "./gemini.js";
 
 const good = { isPhoto: true, faceCount: 1, clear: true, obstructed: false };
 
@@ -30,4 +30,13 @@ test("API statuses map to the retry policy", () => {
   assert.equal(classifyApiStatus(503).retryable, true);
   assert.equal(classifyApiStatus(400).retryable, false);
   assert.equal(classifyApiStatus(403).code, "PROVIDER_REJECTED");
+});
+
+test("an empty face check answer is a refusal, not 'not a photo'", () => {
+  assert.throws(() => parseFaceCheckAnswer(""), { code: "FACE_CHECK_REFUSED" });
+  assert.throws(() => parseFaceCheckAnswer(undefined), { code: "FACE_CHECK_REFUSED" });
+  assert.throws(() => parseFaceCheckAnswer("{}"), { code: "FACE_CHECK_INVALID_RESPONSE" });
+  assert.deepEqual(parseFaceCheckAnswer('{"isPhoto":true,"faceCount":1,"clear":true,"obstructed":false}'), {
+    isPhoto: true, faceCount: 1, clear: true, obstructed: false
+  });
 });

@@ -19,12 +19,31 @@ import { loadMe } from "../auth/load-me.js";
 import { getUserId, requireUser } from "../auth/require-user.js";
 import { isDailyCapReached, isEmailAllowed, parseAllowedEmails } from "../generation/guard.js";
 import { countRecentPhotoJobs } from "../generation/jobs.js";
-import { getAiProvider } from "../generation/providers/index.js";
+import { getAiProvider, ProviderError } from "../generation/providers/index.js";
+import type { FaceCheckResult } from "../generation/providers/types.js";
 import { checkMomentChoice } from "../generation/rules.js";
 import { mediaUrl, sortMoments, toMomentDto } from "./service.js";
 
 function fail(reply: FastifyReply, status: number, error: string) {
+  // Logged so rejected uploads and generations can be explained from the server logs.
+  reply.log.info({ status, code: error }, "Story request rejected");
   return reply.code(status).send({ error });
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const FACE_CHECK_ATTEMPTS = 3;
+
+/** Face check with short retries on quota/availability errors; the user is waiting, so keep it under ~10 s. */
+async function checkFaceWithRetry(image: Buffer, mimeType: string): Promise<FaceCheckResult> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await getAiProvider().checkFace(image, mimeType);
+    } catch (error) {
+      const retryable = error instanceof ProviderError && error.retryable;
+      if (!retryable || attempt >= FACE_CHECK_ATTEMPTS) throw error;
+      await sleep(1500 * attempt);
+    }
+  }
 }
 
 async function latestSourcePhoto(userId: string) {
@@ -37,7 +56,7 @@ async function latestSourcePhoto(userId: string) {
 async function loadUser(userId: string) {
   return prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { birthMonth: true, birthYear: true, locale: true }
+    select: { birthMonth: true, birthYear: true, locale: true, email: true }
   });
 }
 
@@ -91,6 +110,7 @@ export async function storyRoutes(app: FastifyInstance) {
 
     return {
       canCreate: me.readiness.canCreate,
+      aiAllowed: isEmailAllowed(user.email, parseAllowedEmails(env.AI_ALLOWED_EMAILS)),
       currentAge: getAge({ month: user.birthMonth, year: user.birthYear }),
       sourcePhoto: photo ? { id: photo.id, url: mediaUrl(env.API_URL, photo.id) } : null,
       moments: sortMoments(rows).map((row) =>
@@ -130,8 +150,11 @@ export async function storyRoutes(app: FastifyInstance) {
     if (!(await acquireProviderSlot())) return fail(reply, 503, "FACE_CHECK_UNAVAILABLE");
     let faceCheck;
     try {
-      faceCheck = await getAiProvider().checkFace(prepared.buffer, prepared.contentType);
+      faceCheck = await checkFaceWithRetry(prepared.buffer, prepared.contentType);
     } catch (error) {
+      if (error instanceof ProviderError && error.code === "FACE_CHECK_REFUSED") {
+        return fail(reply, 422, "FACE_CHECK_REFUSED");
+      }
       request.log.error({ err: error }, "Face check failed");
       return fail(reply, 503, "FACE_CHECK_UNAVAILABLE");
     }

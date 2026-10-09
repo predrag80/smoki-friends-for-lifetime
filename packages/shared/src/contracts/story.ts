@@ -30,6 +30,8 @@ export const storyErrorCodes = [
   "DAILY_LIMIT_REACHED",
   "FACE_CHECK_UNAVAILABLE",
   "AI_NOT_ALLOWED",
+  "FACE_CHECK_REFUSED",
+  "RATE_LIMITED",
   "AI_DAILY_CAP_REACHED"
 ] as const;
 export type StoryErrorCode = (typeof storyErrorCodes)[number];
@@ -67,6 +69,8 @@ export type MomentDto = z.infer<typeof momentDtoSchema>;
 
 export const storyResponseSchema = z.object({
   canCreate: z.boolean(),
+  /** False when AI is limited to test accounts (AI_ALLOWED_EMAILS) and this account is not one of them. */
+  aiAllowed: z.boolean(),
   currentAge: z.number(),
   sourcePhoto: z.object({ id: z.string(), url: z.string() }).nullable(),
   moments: z.array(momentDtoSchema),
