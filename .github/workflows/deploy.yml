@@ -103,8 +103,20 @@ jobs:
           $COMPOSE build
           $COMPOSE up -d postgres valkey storage-perms storage storage-init mailpit
           $COMPOSE run --rm migrate
-          $COMPOSE up -d --remove-orphans backend worker frontend caddy
+          # Always recreate the app containers so they run the images built above.
+          $COMPOSE up -d --remove-orphans --force-recreate backend worker frontend
+          $COMPOSE up -d caddy
           $COMPOSE ps
+          # Every page in frontend/app must be in the running frontend build (guards against a stale image).
+          MISSING=""
+          for page in $(find frontend/app -name page.tsx | sed -e 's#^frontend/app##' -e 's#page.tsx$##'); do
+            $COMPOSE exec -T frontend test -e "frontend/.next/server/app${page}page.js" || MISSING="$MISSING $page"
+          done
+          if [ -n "$MISSING" ]; then
+            echo "::error::Frontend build is missing pages:$MISSING"
+            exit 1
+          fi
+          echo "Frontend pages OK"
           docker image prune -f
           SCRIPT
 
