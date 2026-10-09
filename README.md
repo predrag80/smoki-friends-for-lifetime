@@ -76,6 +76,17 @@ tested for free. To use Gemini set `AI_PROVIDER=gemini` and either `GEMINI_API_K
 `GEMINI_USE_VERTEX=true` with `GOOGLE_CLOUD_PROJECT` / `GOOGLE_CLOUD_LOCATION` (Vertex AI, application
 default credentials). Limits and retries are configured in `backend/.env.example`.
 
+### AI proof-of-concept
+
+`npm run poc:photos -w @sffl/backend` runs test photos from `poc/photos/` (named `name__1985.jpg`,
+birth year with optional `-MM`) through the real image model, about 8 combinations per person across
+the three periods, and writes `poc/results/<run>/report.html` with success rates, refusal reasons,
+timings and per-image ratings (exported as CSV). Options: `--provider mock|gemini`, `--people N`,
+`--concurrency N`, `--model …`, `--location …`, `--skip-face-check`.
+`npm run poc:living -w @sffl/backend -- ../poc/results/<run>` adds a 6 s "living photo" MP4 per image
+(requires ffmpeg). The `poc/` folder holds personal data and is ignored by git; nothing touches the
+database or storage.
+
 ## Production mode locally
 
 ```sh

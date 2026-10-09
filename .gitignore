@@ -27,3 +27,6 @@ pnpm-debug.log*
 .codex
 .agents
 .playwright-mcp
+
+# AI proof-of-concept photos and results (personal data, never commit)
+/poc/
