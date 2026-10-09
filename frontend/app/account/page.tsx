@@ -7,7 +7,7 @@ export default async function AccountPage() {
   const messages = getMessages(await getRequestLocale());
 
   return (
-    <AuthShell title={messages.account.title} wide>
+    <AuthShell title={messages.account.title} wide action={{ href: "/story", label: messages.nav.story }}>
       <AccountView />
     </AuthShell>
   );

@@ -17,9 +17,20 @@ export default async function HomePage() {
       <div className={styles.hero}>
         <BrandBar
           action={
-            <Link href={signedIn ? "/account" : "/login"} className={styles.barLink}>
-              {signedIn ? messages.nav.account : messages.nav.login}
-            </Link>
+            signedIn ? (
+              <nav className={styles.barNav}>
+                <Link href="/story" className={styles.barLink}>
+                  {messages.nav.story}
+                </Link>
+                <Link href="/account" className={styles.barLinkQuiet}>
+                  {messages.nav.account}
+                </Link>
+              </nav>
+            ) : (
+              <Link href="/login" className={styles.barLink}>
+                {messages.nav.login}
+              </Link>
+            )
           }
         />
 

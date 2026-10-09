@@ -349,7 +349,8 @@ export async function authRoutes(app: FastifyInstance) {
     }
 
     await startSession(reply, lookup.token.userId, getRequestMeta(request));
-    return reply.redirect(`${env.APP_URL}/account`);
+    // The story page sends accounts that are not ready yet to /account.
+    return reply.redirect(`${env.APP_URL}/story`);
   });
 
   app.post("/auth/google/signup-info", { config: strictRateLimit }, async (request, reply) => {

@@ -10,7 +10,8 @@ const sr = {
   nav: {
     home: "Početna",
     login: "Prijavi se",
-    account: "Moj nalog"
+    account: "Moj nalog",
+    story: "Moja priča"
   },
   home: {
     headline: ["Isti ti.", "Različita životna doba.", "Smoki je uvek tu."],
