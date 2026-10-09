@@ -68,6 +68,14 @@ Create an OAuth client of type "Web application" in Google Cloud, add the redire
 `http://localhost:4100/auth/google/callback`, and set `GOOGLE_OAUTH_CLIENT_ID` and
 `GOOGLE_OAUTH_CLIENT_SECRET` in `backend/.env`. Without them the Google button is hidden.
 
+### AI provider
+
+Photo generation runs in the worker. By default `AI_PROVIDER=mock`: no external calls, the
+"generated" photo is a labelled placeholder made from the uploaded photo, so the whole flow can be
+tested for free. To use Gemini set `AI_PROVIDER=gemini` and either `GEMINI_API_KEY`, or
+`GEMINI_USE_VERTEX=true` with `GOOGLE_CLOUD_PROJECT` / `GOOGLE_CLOUD_LOCATION` (Vertex AI, application
+default credentials). Limits and retries are configured in `backend/.env.example`.
+
 ## Production mode locally
 
 ```sh

@@ -20,7 +20,7 @@
     "dev:backend": "npm run dev -w @sffl/backend",
     "dev:worker": "npm run dev:worker -w @sffl/backend",
     "build": "npm run build -w @sffl/shared && npm run build -w @sffl/frontend && npm run build -w @sffl/backend",
-    "lint": "npm run lint -w @sffl/shared && npm run lint -w @sffl/frontend && npm run lint -w @sffl/backend",
+    "lint": "npm run build -w @sffl/shared && npm run lint -w @sffl/shared && npm run lint -w @sffl/frontend && npm run lint -w @sffl/backend",
     "typecheck": "npm run build -w @sffl/shared && npm run typecheck -w @sffl/shared && npm run typecheck -w @sffl/frontend && npm run typecheck -w @sffl/backend",
     "test": "npm run test -w @sffl/shared && npm run test -w @sffl/frontend && npm run test -w @sffl/backend"
   },

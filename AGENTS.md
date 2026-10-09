@@ -26,9 +26,13 @@ an automatically edited final "Friend for a Lifetime" film.
 - Cache/locks/rate-limit: Valkey (Redis protocol, ioredis).
 - Async jobs: dedicated worker process (`src/worker.ts`, `PROCESS_ROLE=api|worker|all`), DB-backed
   job table with statuses, retries and per-user limits (same pattern as Smoki avatar jobs).
-- Storage: private S3-compatible bucket (RustFS locally). User photos and generated media are never public;
-  access goes through short-lived signed URLs.
-- AI: image generation via Gemini; video provider TBD (decision in generation phase).
+- Storage: private S3-compatible bucket (RustFS locally), keys `users/{userId}/{kind}/{id}.{ext}`.
+  User photos and generated media are never public; the browser reads them only through
+  `GET /media/:id` (session required, owner only, `cache-control: private`).
+- AI: provider abstraction in `backend/src/modules/generation/providers/` selected by `AI_PROVIDER`:
+  `mock` (default; placeholder image built from the user's photo, no external calls) or `gemini`
+  (API key, or Vertex AI with `GEMINI_USE_VERTEX=true` — preferred for production because of
+  zero data retention). Video provider TBD (phase 5).
 - Final film montage: ffmpeg in the worker.
 
 ## Markets And Languages
@@ -73,7 +77,16 @@ an automatically edited final "Friend for a Lifetime" film.
 - A user can create moments only when `readiness.canCreate` is true: email verified, guardian
   confirmed when required, photo-processing consent given.
 - Account deletion anonymises the email, removes sessions/tokens/OAuth links/guardian data, revokes
-  consents and sets `deletedAt`; media purge is done by the worker in the generation phase.
+  consents and sets `deletedAt`; the worker then purges storage objects and deletes the user row
+  with all moments, jobs and media (`ACCOUNT_PURGE_INTERVAL_MINUTES`).
+- Photo upload (`POST /photos`): jpeg/png/webp, max `PHOTO_MAX_BYTES`, min side `PHOTO_MIN_DIMENSION`;
+  sharp normalises (rotate, resize to 1600, JPEG, metadata stripped), then an AI face check must find
+  exactly one clear, unobstructed face. The source photo is kept until account deletion.
+- Photo generation: `POST /moments` and `POST /moments/:id/regenerate` enqueue a PHOTO job; limit
+  `GENERATIONS_PER_PERIOD_PER_DAY` (default 3) per moment in a rolling 24 h window; retries with
+  backoff up to `GENERATION_MAX_ATTEMPTS`; global provider throttle `AI_REQUESTS_PER_MINUTE` in Valkey.
+  A failed regenerate keeps the previous photo. Prompts are built server-side from `Scene.aiPrompt`
+  (`buildPhotoPrompt`); users never write prompts.
 - Every stored file is a `MediaAsset` row pointing to a private storage key (source photo,
   generated photo, video, final film). One `Moment` per user per life period.
 - `GenerationJob` is the queue table (status + runAfter + lock) and the source for limits/cost analytics.
@@ -112,7 +125,8 @@ an automatically edited final "Friend for a Lifetime" film.
    GenerationJob, FinalFilm, ShareLink; scene catalog seed with age rules; `GET /scenes`. (done)
 3. Auth + consent — email/password + Google sign-in, email verification, sessions, consents,
    guardian consent for minors, account deletion, branded home and auth screens. (done)
-4. Photo pipeline — upload to private storage, AI photo job, status polling, regenerate with limits.
+4. Photo pipeline — upload to private storage, face check, AI photo job (mock provider), status polling,
+   regenerate with limits, account purge, `/story` screen with moment builder. (done)
 5. Video pipeline — video job from approved photo, queue/status, fallback on failure.
 6. "Moja Smoki priča" — film strip with three periods, final montage job.
 7. Sharing + return — export, share links/landing for friends, meaningful reminders.
@@ -122,6 +136,6 @@ an automatically edited final "Friend for a Lifetime" film.
 
 ## Open Decisions (from the proposal)
 - Film length and format; final montage length.
-- Generation limits per person/day and fallback rules.
+- AI provider for production (recommended: Gemini on Vertex AI); fallback rules.
 - Minimum user age, consents, other people in frame, moderation, retention and deletion.
 - Final translations, timezone for campaign start/end, server/storage capacity.
