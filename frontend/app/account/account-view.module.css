@@ -95,3 +95,8 @@
   flex-wrap: wrap;
   gap: 0.75rem;
 }
+
+.ready {
+  display: grid;
+  gap: 0.75rem;
+}

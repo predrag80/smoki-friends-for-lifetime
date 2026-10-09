@@ -2,6 +2,7 @@
 
 import type { MeResponse } from "@sffl/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
@@ -109,7 +110,14 @@ export function AccountView() {
 
       <section>
         <h2 className={styles.sectionTitle}>{a.stepsTitle}</h2>
-        {readiness.canCreate ? <p className={ui.notice}>{a.ready}</p> : null}
+        {readiness.canCreate ? (
+          <div className={styles.ready}>
+            <p className={ui.notice}>{a.ready}</p>
+            <Link className={ui.primary} href="/story">
+              {a.storyCta}
+            </Link>
+          </div>
+        ) : null}
         <ol className={styles.steps}>
           <Step title={a.emailStep} done={user.emailVerified}>
             {user.emailVerified ? (

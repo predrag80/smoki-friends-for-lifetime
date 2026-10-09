@@ -9,7 +9,7 @@ export class ApiError extends Error {
   }
 }
 
-type ApiOptions = { method?: "GET" | "POST" | "DELETE"; body?: unknown };
+type ApiOptions = { method?: "GET" | "POST" | "DELETE"; body?: unknown; form?: FormData };
 
 /** Browser calls to the API. The session cookie is sent with every request. */
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
@@ -19,7 +19,7 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
       method: options.method ?? "GET",
       credentials: "include",
       headers: options.body === undefined ? undefined : { "content-type": "application/json" },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body)
+      body: options.form ?? (options.body === undefined ? undefined : JSON.stringify(options.body))
     });
   } catch {
     throw new ApiError(0, "NETWORK");

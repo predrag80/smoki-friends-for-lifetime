@@ -34,7 +34,7 @@ export default async function HomePage() {
             </h1>
             <p className={styles.lead}>{home.intro}</p>
             <div className={styles.actions}>
-              <Link href={signedIn ? "/account" : "/register"} className={styles.cta}>
+              <Link href={signedIn ? "/story" : "/register"} className={styles.cta}>
                 {signedIn ? home.ctaSignedIn : home.cta}
               </Link>
               {signedIn ? null : (
