@@ -90,7 +90,9 @@ const envSchema = z.object({
   GOOGLE_CLOUD_LOCATION: z.string().default("europe-west1"),
   GEMINI_IMAGE_MODEL: z.string().default("gemini-3.1-flash-image"),
   GEMINI_CHECK_MODEL: z.string().default("gemini-2.5-flash"),
-  GEMINI_IMAGE_ASPECT_RATIO: z.string().default("3:4")
+  GEMINI_IMAGE_ASPECT_RATIO: z.string().default("3:4"),
+  /** Optional packshot of the real Smoki package; sent to the image model as a second reference. */
+  PRODUCT_REFERENCE_IMAGE: z.string().optional()
 });
 
 export type Env = z.infer<typeof envSchema>;

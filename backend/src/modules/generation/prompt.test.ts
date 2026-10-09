@@ -18,3 +18,16 @@ test("the prompt keeps identity, the scene and the safety rules", () => {
   assert.match(prompt, /must not resemble real or famous people/);
   assert.match(prompt, /No text/);
 });
+
+test("companions match the target age and teenagers must not look adult", () => {
+  const prompt = buildPhotoPrompt({ ...base, targetAge: 15, currentAge: 46 });
+  assert.match(prompt, /about the same age as the person \(around 15/);
+  assert.match(prompt, /a teenager of 15, not an adult/);
+  assert.match(prompt, /do not copy the clothing/);
+  assert.match(prompt, /never held up or presented to the camera/);
+});
+
+test("the product reference image is mentioned only when it is sent", () => {
+  assert.match(buildPhotoPrompt({ ...base, targetAge: 30, currentAge: 30, productReference: true }), /second reference image shows the real Smoki package/);
+  assert.doesNotMatch(buildPhotoPrompt({ ...base, targetAge: 30, currentAge: 30 }), /second reference image/);
+});

@@ -30,6 +30,8 @@ export type PocRun = {
   provider: string;
   imageModel: string;
   location: string;
+  /** File name of the Smoki packshot sent as a reference, if any. */
+  productReference?: string;
   startedAt: string;
   finishedAt?: string;
   people: PocPerson[];

@@ -85,7 +85,7 @@ button.off{background:#eee;color:#555}.person{border-top:3px solid var(--red);pa
 details{padding:0 12px 10px;font-size:12px;color:#6b5a50}.bad{color:var(--red)}.hidden{display:none}
 </style></head><body><main>
 <h1>Probni test generisanja</h1>
-<p class="sub">Run ${esc(run.runId)} · provajder ${esc(run.provider)} · model ${esc(run.imageModel)} · region ${esc(run.location)} · ${run.people.length} osoba · ${esc(run.startedAt)}${run.finishedAt ? ` – ${esc(run.finishedAt)}` : " (u toku)"}</p>
+<p class="sub">Run ${esc(run.runId)} · provajder ${esc(run.provider)} · model ${esc(run.imageModel)} · region ${esc(run.location)} · pakovanje: ${run.productReference ? esc(run.productReference) : "bez reference"} · ${run.people.length} osoba · ${esc(run.startedAt)}${run.finishedAt ? ` – ${esc(run.finishedAt)}` : " (u toku)"}</p>
 <div class="summary">
 <div><h3>Rezultat po periodu</h3><table><tr><th>Period</th><th>Pokušaja</th><th>Uspeh</th><th>Blok.</th><th>Greške</th><th>Prosek</th><th>p95</th></tr>
 ${stats.map((row) => `<tr><td>${periodLabel[row.period]}</td><td>${row.total}</td><td><b>${pct(row.successRate)}</b></td><td>${row.blocked}</td><td>${row.errors}</td><td>${seconds(row.avgSeconds)}</td><td>${seconds(row.p95Seconds)}</td></tr>`).join("")}

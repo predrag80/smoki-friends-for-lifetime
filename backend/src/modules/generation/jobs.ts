@@ -1,12 +1,14 @@
 import { randomUUID } from "node:crypto";
 
-import { getAge, GENERATION_WINDOW_MS, retryDelayMs, sceneCatalog } from "@sffl/shared";
+import { getAge, GENERATION_WINDOW_MS, sceneCatalog } from "@sffl/shared";
 
 import { getEnv } from "../../config/env.js";
 import { prisma } from "../../lib/prisma.js";
 import { deleteObjects, getObject, mediaKey, putObject } from "../../lib/storage.js";
+import { getProductReference } from "./product-reference.js";
 import { buildPhotoPrompt } from "./prompt.js";
 import { ProviderError, type AiProvider } from "./providers/index.js";
+import { nextRetryDelay } from "./retry.js";
 
 type Logger = { info: (obj: object, msg?: string) => void; error: (obj: object, msg?: string) => void };
 
@@ -76,18 +78,21 @@ export async function processPhotoJob(jobId: string, provider: AiProvider, logge
 
   try {
     const source = await getObject(job.inputAsset.storageKey);
+    const productImage = await getProductReference(getEnv().PRODUCT_REFERENCE_IMAGE);
     const prompt = buildPhotoPrompt({
       scenePrompt: scenePromptFor(moment.sceneId, moment.scene.aiPrompt),
       territory: moment.scene.territory,
       period: moment.period,
       targetAge: moment.targetAge,
-      currentAge: getAge({ month: moment.user.birthMonth, year: moment.user.birthYear })
+      currentAge: getAge({ month: moment.user.birthMonth, year: moment.user.birthYear }),
+      productReference: Boolean(productImage)
     });
 
     const result = await provider.generatePhoto({
       sourceImage: source,
       sourceMimeType: job.inputAsset.contentType,
       prompt,
+      productImage,
       label: {
         sceneTitle: moment.scene.translations[0]?.title ?? moment.sceneId,
         targetAge: moment.targetAge,
@@ -144,7 +149,7 @@ export async function processPhotoJob(jobId: string, provider: AiProvider, logge
         where: { id: job.id },
         data: {
           status: "QUEUED",
-          runAfter: new Date(Date.now() + retryDelayMs(job.attempts)),
+          runAfter: new Date(Date.now() + nextRetryDelay(error, job.attempts)),
           lockedBy: null,
           lockedAt: null,
           errorCode: code,

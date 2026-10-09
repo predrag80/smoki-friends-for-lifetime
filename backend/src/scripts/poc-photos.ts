@@ -11,7 +11,9 @@ import { PhotoRejectedError, prepareSourcePhoto } from "../lib/images.js";
 import { buildPhotoPrompt } from "../modules/generation/prompt.js";
 import { createGeminiProvider } from "../modules/generation/providers/gemini.js";
 import { createMockProvider } from "../modules/generation/providers/mock.js";
-import { ProviderError, type AiProvider } from "../modules/generation/providers/types.js";
+import { loadProductReference } from "../modules/generation/product-reference.js";
+import { ProviderError, type AiProvider, type GeneratePhotoInput } from "../modules/generation/providers/types.js";
+import { nextRetryDelay } from "../modules/generation/retry.js";
 import { parsePhotoName, planCases, type PocCase } from "../modules/poc/plan.js";
 import { buildReport } from "../modules/poc/report.js";
 import type { PocAttempt, PocPerson, PocRun } from "../modules/poc/results.js";
@@ -19,7 +21,8 @@ import type { PocAttempt, PocPerson, PocRun } from "../modules/poc/results.js";
 /**
  * Proof-of-concept run against the real image model.
  *   npm run poc:photos -w @sffl/backend -- [--provider gemini|mock] [--photos ../poc/photos]
- *       [--out ../poc/results] [--people 3] [--concurrency 2] [--model …] [--location …]
+ *       [--out ../poc/results] [--people 3] [--concurrency 1] [--model …] [--location …]
+ *       [--product ../poc/smoki-pack.png]
  * Photos are named `name__1985.jpg` (birth year, optional `-MM` month). Nothing here touches the
  * database or storage; results and the HTML report go to the output folder (ignored by git).
  */
@@ -29,7 +32,8 @@ const { values: args } = parseArgs({
     photos: { type: "string", default: "../poc/photos" },
     out: { type: "string", default: "../poc/results" },
     people: { type: "string" },
-    concurrency: { type: "string", default: "2" },
+    concurrency: { type: "string", default: "1" },
+    product: { type: "string" },
     model: { type: "string" },
     location: { type: "string" },
     "skip-face-check": { type: "boolean", default: false }
@@ -50,15 +54,26 @@ function createProvider(): AiProvider {
   return createGeminiProvider(env);
 }
 
-const MAX_ATTEMPTS = 2;
+const MAX_ATTEMPTS = 4;
 
-async function generate(provider: AiProvider, item: PocCase, currentAge: number, source: Buffer, dir: string, file: string) {
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function generate(
+  provider: AiProvider,
+  item: PocCase,
+  currentAge: number,
+  source: Buffer,
+  productImage: GeneratePhotoInput["productImage"],
+  dir: string,
+  file: string
+) {
   const prompt = buildPhotoPrompt({
     scenePrompt: item.scene.prompt,
     territory: item.scene.territory,
     period: item.period,
     targetAge: item.targetAge,
-    currentAge
+    currentAge,
+    productReference: Boolean(productImage)
   });
   const base: Omit<PocAttempt, "status" | "ms" | "attempts"> = {
     id: `${item.period}-${item.targetAge}-${item.scene.id}`,
@@ -77,6 +92,7 @@ async function generate(provider: AiProvider, item: PocCase, currentAge: number,
         sourceImage: source,
         sourceMimeType: "image/jpeg",
         prompt,
+        productImage,
         label: { sceneTitle: item.scene.title, targetAge: item.targetAge, period: item.period }
       });
       const ext = result.mimeType.includes("png") ? "png" : "jpg";
@@ -86,7 +102,14 @@ async function generate(provider: AiProvider, item: PocCase, currentAge: number,
     } catch (error) {
       const providerError = error instanceof ProviderError ? error : null;
       const retryable = providerError ? providerError.retryable : true;
-      if (retryable && attempt < MAX_ATTEMPTS) continue;
+      // Quota errors are common on new projects: wait and retry instead of giving up.
+      const attemptsAllowed = providerError?.code === "RATE_LIMITED" ? MAX_ATTEMPTS : 2;
+      if (retryable && attempt < attemptsAllowed) {
+        const wait = nextRetryDelay(error, attempt);
+        console.log(`  ${base.id}: ${providerError?.code ?? "error"}, retry in ${Math.round(wait / 1000)} s`);
+        await sleep(wait);
+        continue;
+      }
       return {
         ...base,
         status: providerError?.code === "BLOCKED" ? "blocked" : "error",
@@ -110,6 +133,7 @@ async function runPool<T>(items: T[], limit: number, worker: (item: T) => Promis
 
 async function main() {
   const provider = createProvider();
+  const productImage = args.product ? await loadProductReference(resolve(args.product)) : undefined;
   const photosDir = resolve(args.photos);
   const files = (await readdir(photosDir)).filter((name) => parsePhotoName(name)).sort();
   const skipped = (await readdir(photosDir)).filter((name) => !name.startsWith(".") && !parsePhotoName(name));
@@ -126,6 +150,7 @@ async function main() {
     provider: provider.name,
     imageModel: args.provider === "mock" ? "mock" : env.GEMINI_IMAGE_MODEL,
     location: env.GEMINI_USE_VERTEX ? env.GOOGLE_CLOUD_LOCATION : "gemini-api",
+    productReference: args.product ? args.product.split("/").pop() : undefined,
     startedAt: new Date().toISOString(),
     people: []
   };
@@ -175,7 +200,7 @@ async function main() {
 
     const cases = planCases(currentAge, index);
     await runPool(cases, Number(args.concurrency), async (item) => {
-      const result = await generate(provider, item, currentAge, source, outDir, folder);
+      const result = await generate(provider, item, currentAge, source, productImage, outDir, folder);
       person.attempts.push(result);
       console.log(`  ${parsed.name} ${result.id}: ${result.status}${result.code ? ` (${result.code} ${result.detail ?? ""})` : ""} ${(result.ms / 1000).toFixed(1)}s`);
       await persist();

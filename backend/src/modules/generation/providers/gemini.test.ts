@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { interpretFaceCheck, isSafetyStop } from "./gemini.js";
+import { classifyApiStatus, interpretFaceCheck, isSafetyStop } from "./gemini.js";
 
 const good = { isPhoto: true, faceCount: 1, clear: true, obstructed: false };
 
@@ -23,4 +23,11 @@ test("safety finish reasons are treated as a refusal", () => {
   assert.equal(isSafetyStop("IMAGE_PROHIBITED_CONTENT"), true);
   assert.equal(isSafetyStop("STOP"), false);
   assert.equal(isSafetyStop("MAX_TOKENS"), false);
+});
+
+test("API statuses map to the retry policy", () => {
+  assert.deepEqual(classifyApiStatus(429), { code: "RATE_LIMITED", retryable: true, retryAfterMs: 30000 });
+  assert.equal(classifyApiStatus(503).retryable, true);
+  assert.equal(classifyApiStatus(400).retryable, false);
+  assert.equal(classifyApiStatus(403).code, "PROVIDER_REJECTED");
 });

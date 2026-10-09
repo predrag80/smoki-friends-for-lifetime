@@ -8,6 +8,8 @@ export type GeneratePhotoInput = {
   sourceImage: Buffer;
   sourceMimeType: string;
   prompt: string;
+  /** Optional packshot of the real Smoki package, sent as a second reference image. */
+  productImage?: { data: Buffer; mimeType: string };
   /** Used by the mock provider to label its placeholder image. */
   label: { sceneTitle: string; targetAge: number; period: LifePeriod };
 };
@@ -25,7 +27,9 @@ export class ProviderError extends Error {
   constructor(
     readonly code: string,
     readonly retryable: boolean,
-    message?: string
+    message?: string,
+    /** Minimum wait before the next attempt (e.g. after a quota error). */
+    readonly retryAfterMs?: number
   ) {
     super(message ?? code);
   }

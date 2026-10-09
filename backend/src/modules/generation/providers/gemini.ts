@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { ApiError, GoogleGenAI, Type } from "@google/genai";
 
 import type { Env } from "../../../config/env.js";
 import { ProviderError, type AiProvider, type FaceCheckResult } from "./types.js";
@@ -38,6 +38,32 @@ export function isSafetyStop(finishReason: string): boolean {
   return SAFETY_FINISH_REASONS.some((marker) => finishReason.includes(marker));
 }
 
+const RATE_LIMIT_WAIT_MS = 30_000;
+
+/** Maps an HTTP status from the Gemini/Vertex API to our retry policy. */
+export function classifyApiStatus(status: number): { code: string; retryable: boolean; retryAfterMs?: number } {
+  if (status === 429) return { code: "RATE_LIMITED", retryable: true, retryAfterMs: RATE_LIMIT_WAIT_MS };
+  if (status >= 500) return { code: "PROVIDER_UNAVAILABLE", retryable: true };
+  if (status === 408) return { code: "TIMEOUT", retryable: true };
+  return { code: "PROVIDER_REJECTED", retryable: false };
+}
+
+function toProviderError(error: unknown): unknown {
+  if (error instanceof ApiError) {
+    const { code, retryable, retryAfterMs } = classifyApiStatus(error.status);
+    return new ProviderError(code, retryable, error.message.slice(0, 500), retryAfterMs);
+  }
+  return error;
+}
+
+async function call<T>(promise: Promise<T>, ms: number): Promise<T> {
+  try {
+    return await withTimeout(promise, ms);
+  } catch (error) {
+    throw toProviderError(error);
+  }
+}
+
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
@@ -58,7 +84,7 @@ export function createGeminiProvider(env: Env): AiProvider {
     name: env.GEMINI_USE_VERTEX ? "vertex" : "gemini",
 
     async checkFace(image, mimeType) {
-      const response = await withTimeout(
+      const response = await call(
         ai.models.generateContent({
           model: env.GEMINI_CHECK_MODEL,
           contents: [{ inlineData: { mimeType, data: image.toString("base64") } }, { text: FACE_CHECK_PROMPT }],
@@ -74,11 +100,14 @@ export function createGeminiProvider(env: Env): AiProvider {
     },
 
     async generatePhoto(input) {
-      const response = await withTimeout(
+      const response = await call(
         ai.models.generateContent({
           model: env.GEMINI_IMAGE_MODEL,
           contents: [
             { inlineData: { mimeType: input.sourceMimeType, data: input.sourceImage.toString("base64") } },
+            ...(input.productImage
+              ? [{ inlineData: { mimeType: input.productImage.mimeType, data: input.productImage.data.toString("base64") } }]
+              : []),
             { text: input.prompt }
           ],
           config: { responseModalities: ["IMAGE"], imageConfig: { aspectRatio: env.GEMINI_IMAGE_ASPECT_RATIO } }
