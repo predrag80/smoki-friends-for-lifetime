@@ -27,6 +27,8 @@ export async function buildServer() {
   const env = getEnv();
   const app = Fastify({
     trustProxy: true,
+    // A request (including a slow upload) that does not finish in 2 minutes is closed instead of hanging forever.
+    requestTimeout: 120_000,
     logger: {
       serializers: {
         // Query strings can contain one-time tokens; never write them to logs.

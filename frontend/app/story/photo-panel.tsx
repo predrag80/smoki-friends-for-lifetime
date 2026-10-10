@@ -13,6 +13,8 @@ import styles from "./story.module.css";
 const MAX_BYTES = 10 * 1024 * 1024;
 /** Longest side sent to the server; the server keeps at most 1600 px anyway, so nothing is lost. */
 const UPLOAD_MAX_SIDE = 1600;
+/** Upload + face check normally take a few seconds; never leave the user waiting forever. */
+const UPLOAD_TIMEOUT_MS = 90_000;
 
 /**
  * Shrinks phone photos (often 3–10 MB) to a ~0.3–0.6 MB JPEG before upload, so slow mobile connections
@@ -49,7 +51,7 @@ export function PhotoPanel({ photo }: { photo: { id: string; url: string } | nul
     mutationFn: async (file: File) => {
       const form = new FormData();
       form.append("photo", await shrinkForUpload(file), "photo.jpg");
-      return apiFetch<PhotoUploadResponse>("/photos", { method: "POST", form });
+      return apiFetch<PhotoUploadResponse>("/photos", { method: "POST", form, timeoutMs: UPLOAD_TIMEOUT_MS });
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["story"] }),
     onError: (failure) => setError(errorCode(failure))

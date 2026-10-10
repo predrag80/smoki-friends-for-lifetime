@@ -260,6 +260,7 @@ const sr = {
     DAILY_LIMIT_REACHED: "Za danas si iskoristio/la sve pokušaje za ovaj trenutak.",
     FACE_CHECK_UNAVAILABLE: "Provera fotografije trenutno nije dostupna. Pokušaj za minut.",
     GENERATION_FAILED: "Fotografija ovaj put nije uspela. Probaj ponovo.",
+    TIMEOUT: "Slanje fotografije traje predugo. Proveri internet vezu i pokušaj ponovo.",
     FACE_CHECK_REFUSED: "Ovu fotografiju ne možemo da obradimo. Probaj drugu, jasnu fotografiju samo svog lica.",
     AI_NOT_ALLOWED: "Pravljenje fotografija je trenutno dostupno samo test korisnicima.",
     AI_DAILY_CAP_REACHED: "Danas je napravljeno mnogo fotografija. Probaj ponovo sutra.",

@@ -9,20 +9,31 @@ export class ApiError extends Error {
   }
 }
 
-type ApiOptions = { method?: "GET" | "POST" | "DELETE"; body?: unknown; form?: FormData };
+type ApiOptions = {
+  method?: "GET" | "POST" | "DELETE";
+  body?: unknown;
+  form?: FormData;
+  /** Abort after this many milliseconds and fail with code TIMEOUT (used for uploads on slow networks). */
+  timeoutMs?: number;
+};
 
 /** Browser calls to the API. The session cookie is sent with every request. */
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
   let response: Response;
+  const controller = options.timeoutMs ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), options.timeoutMs) : null;
   try {
     response = await fetch(`${getApiBaseUrl()}${path}`, {
       method: options.method ?? "GET",
       credentials: "include",
       headers: options.body === undefined ? undefined : { "content-type": "application/json" },
-      body: options.form ?? (options.body === undefined ? undefined : JSON.stringify(options.body))
+      body: options.form ?? (options.body === undefined ? undefined : JSON.stringify(options.body)),
+      signal: controller?.signal
     });
   } catch {
-    throw new ApiError(0, "NETWORK");
+    throw new ApiError(0, controller?.signal.aborted ? "TIMEOUT" : "NETWORK");
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 
   if (response.status === 204) {
