@@ -7,6 +7,7 @@ import { prisma } from "../../lib/prisma.js";
 import { toDeliveryImage } from "../../lib/images.js";
 import { deleteObjects, getObject, mediaKey, putObject } from "../../lib/storage.js";
 import { getProductReference } from "./product-reference.js";
+import { ensureAgedPortrait, ensureFaceTraits, needsAnotherCandidate } from "./past-moment.js";
 import { buildPhotoPrompt } from "./prompt.js";
 import { ProviderError, type AiProvider } from "./providers/index.js";
 import { nextRetryDelay } from "./retry.js";
@@ -83,28 +84,78 @@ export async function processPhotoJob(jobId: string, provider: AiProvider, logge
 
   try {
     const source = await getObject(job.inputAsset.storageKey);
+    const sourceImage = { data: source, mimeType: job.inputAsset.contentType };
     const productImage = await getProductReference(getEnv().PRODUCT_REFERENCE_IMAGE);
-    const prompt = buildPhotoPrompt({
+    const currentAge = getAge({ month: moment.user.birthMonth, year: moment.user.birthYear });
+    const sceneTitle = moment.scene.translations[0]?.title ?? moment.sceneId;
+    const promptBase = {
       scenePrompt: scenePromptFor(moment.sceneId, moment.scene.aiPrompt),
       territory: moment.scene.territory,
       period: moment.period,
       targetAge: moment.targetAge,
-      currentAge: getAge({ month: moment.user.birthMonth, year: moment.user.birthYear }),
+      currentAge,
       productReference: Boolean(productImage),
       productPlacement: productPlacementFor(moment.sceneId)
-    });
+    };
+    const label = { sceneTitle, targetAge: moment.targetAge, period: moment.period };
 
-    const result = await provider.generatePhoto({
-      sourceImage: source,
-      sourceMimeType: job.inputAsset.contentType,
-      prompt,
-      productImage,
-      label: {
-        sceneTitle: moment.scene.translations[0]?.title ?? moment.sceneId,
+    let result: Awaited<ReturnType<AiProvider["generatePhoto"]>>;
+    if (moment.period === "YESTERDAY") {
+      // Two steps (chosen in the likeness experiment, variant E): a portrait at the target age is the exact face,
+      // today's photo only confirms identity details. The portrait is reused for every scene of that age.
+      const traits = await ensureFaceTraits(provider, job.inputAsset, sourceImage);
+      const portrait = await ensureAgedPortrait({
+        provider,
+        model: provider.name === "mock" ? "mock" : getEnv().GEMINI_IMAGE_MODEL,
+        source: job.inputAsset,
+        image: sourceImage,
         targetAge: moment.targetAge,
-        period: moment.period
+        currentAge,
+        traits
+      });
+      const generateScene = () =>
+        provider.generatePhoto({
+          sourceImage: portrait.data,
+          sourceMimeType: portrait.mimeType,
+          personReferences: [sourceImage],
+          productImage,
+          prompt: buildPhotoPrompt({
+            ...promptBase,
+            identityTraits: traits || undefined,
+            closeFraming: true,
+            agedPortraitReference: true,
+            portraitPrimary: true,
+            calmExpression: true
+          }),
+          label
+        });
+      const scoreScene = (image: { image: Buffer; mimeType: string }) =>
+        provider
+          .rateLikeness({
+            reference: portrait,
+            generated: { data: image.image, mimeType: image.mimeType },
+            targetAge: moment.targetAge,
+            currentAge: moment.targetAge
+          })
+          .catch(() => null);
+
+      result = await generateScene();
+      const score = await scoreScene(result);
+      if (needsAnotherCandidate(score)) {
+        logger.info({ jobId: job.id, score }, "Past moment far from the portrait, generating another candidate");
+        const second = await generateScene().catch(() => null);
+        const secondScore = second ? await scoreScene(second) : null;
+        if (second && (secondScore ?? 0) > (score ?? 0)) result = second;
       }
-    });
+    } else {
+      result = await provider.generatePhoto({
+        sourceImage: source,
+        sourceMimeType: job.inputAsset.contentType,
+        prompt: buildPhotoPrompt(promptBase),
+        productImage,
+        label
+      });
+    }
 
     const image = await toDeliveryImage(result.image);
     const storageKey = mediaKey(job.userId, "photo", randomUUID(), image.extension);
@@ -195,6 +246,7 @@ export async function purgeDeletedAccounts(logger: Logger, batchSize = 20): Prom
       prisma.shareLink.deleteMany({ where: { userId: user.id } }),
       prisma.finalFilm.deleteMany({ where: { userId: user.id } }),
       prisma.moment.deleteMany({ where: { userId: user.id } }),
+      prisma.agedPortrait.deleteMany({ where: { userId: user.id } }),
       prisma.mediaAsset.deleteMany({ where: { userId: user.id } }),
       prisma.user.delete({ where: { id: user.id } })
     ]);

@@ -126,8 +126,11 @@ export function buildPhotoPrompt(input: PromptInput): string {
     ageInstruction(input.targetAge, input.currentAge),
     ...(input.calmExpression
       ? [
-          "The person has a gentle, natural smile (no wide open-mouth laugh), eyes open and clearly visible, " +
-            "face towards the camera or at most a slight three-quarter angle, not in profile."
+          input.territory === "SPORT_CHEERING"
+            ? "The person may cheer and show joy, but the face stays turned towards the camera, eyes open and clearly visible, " +
+              "never hidden by hands or in profile."
+            : "The person has a gentle, natural smile (no wide open-mouth laugh), eyes open and clearly visible, " +
+              "face towards the camera or at most a slight three-quarter angle, not in profile."
         ]
       : []),
     input.closeFraming
@@ -140,9 +143,10 @@ export function buildPhotoPrompt(input: PromptInput): string {
     `Mood: ${territoryMood[input.territory]}.`,
     ...(productPosition ? [productInstruction(input.productPlacement, productPosition)] : []),
     "Other people in the scene are fictional and must not resemble real or famous people.",
-    "No logos or brand names on drinks, food, clothing, devices or anywhere else" +
+    "No logos, labels or brand names on bottles, cans, drinks, food, clothing, devices or anywhere else" +
       (productReference ? " (except the snack package from the reference image)" : "") +
-      "; drinks are in plain glasses or unlabelled bottles.",
+      "; drinks are in plain glasses or plain unlabelled bottles.",
+    "No date stamp or timestamp printed on the photo.",
     "Neutral decorative text in the local language that belongs to the scene (for example a birthday banner) is allowed; no captions, watermarks or other text.",
     "3:4 portrait framing. Family-friendly."
   ].join(" ");

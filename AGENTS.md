@@ -90,6 +90,12 @@ an automatically edited final "Friend for a Lifetime" film.
   write prompts. Scene prompts are brand-free: past moments are set in their calendar year (period look),
   companions match the target age, no third-party brands, neutral local text (e.g. a birthday banner) is
   allowed. The Smoki package appears only when `PRODUCT_REFERENCE_IMAGE` (real packshot) is configured.
+- Past moments ("Juče") use two steps, chosen in the likeness experiment (variant E, `poc:photos --variants`):
+  1) `AgedPortrait`: a neutral portrait at the target age, made once per source photo and age (stored as
+  `AGED_PORTRAIT`, reused for every scene and regeneration); 2) the scene with that portrait as the first reference
+  and today's photo second, plus stable `faceTraits` (described once per source photo), close framing and a calm
+  expression (cheering allowed for SPORT_CHEERING, face visible). A strict likeness check against the portrait
+  regenerates once when the score is <= 4 (same job, no extra user limit). "Danas" and "Sutra" stay single-step.
 - Image model: `gemini-nano-banana-2.1` on Vertex AI, location `global` (Nano Banana 2 /
   `gemini-3.1-flash-image` is being retired). Proof-of-concept runner: `npm run poc:photos -w @sffl/backend`.
 - Every stored file is a `MediaAsset` row pointing to a private storage key (source photo,

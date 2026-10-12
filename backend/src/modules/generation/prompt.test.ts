@@ -17,7 +17,7 @@ test("the prompt keeps identity, the scene and the safety rules", () => {
   assert.match(prompt, /Preserve their identity/);
   assert.match(prompt, /a bench in a park/);
   assert.match(prompt, /must not resemble real or famous people/);
-  assert.match(prompt, /No logos or brand names/);
+  assert.match(prompt, /No logos, labels or brand names/);
   assert.match(prompt, /birthday banner\) is allowed/);
 });
 
@@ -78,4 +78,11 @@ test("with the portrait as primary reference the photo of today becomes the seco
   assert.match(prompt, /third reference image shows a snack package/);
   assert.match(prompt, /gentle, natural smile/);
   assert.doesNotMatch(prompt, /reference image shows this same person at age 8/);
+});
+
+test("cheering scenes may show joy but keep the face visible; no date stamps", () => {
+  const cheering = buildPhotoPrompt({ ...base, territory: "SPORT_CHEERING", targetAge: 15, currentAge: 46, calmExpression: true });
+  assert.match(cheering, /may cheer and show joy, but the face stays turned towards the camera/);
+  assert.doesNotMatch(cheering, /gentle, natural smile/);
+  assert.match(cheering, /No date stamp/);
 });

@@ -186,6 +186,8 @@ const sr = {
     aiNotAllowed:
       "Pravljenje fotografija je trenutno dostupno samo test korisnicima. Javićemo ti čim bude otvoreno za sve.",
     pending: "Pravimo tvoju fotografiju…",
+    pendingPast: "Pravimo tvoju fotografiju iz tog vremena…",
+    pendingPastHint: "Prvi put može potrajati do minut. Možeš da zatvoriš stranicu, sačuvaćemo je.",
     pendingHint: "Možeš da zatvoriš stranicu, sačuvaćemo je.",
     retry: "Pokušaj ponovo",
     regenerate: "Napravi ponovo",

@@ -65,6 +65,8 @@ enum MediaKind {
   GENERATED_PHOTO
   GENERATED_VIDEO
   FINAL_FILM
+  /// Step 1 of a past moment: neutral portrait of the person at the target age, reused for every scene of that age.
+  AGED_PORTRAIT
 }
 
 enum MomentStatus {
@@ -126,6 +128,7 @@ model User {
   generationJobs  GenerationJob[]
   finalFilm       FinalFilm?
   shareLinks      ShareLink[]
+  agedPortraits   AgedPortrait[]
 }
 
 model Session {
@@ -224,10 +227,15 @@ model MediaAsset {
   width       Int?
   height      Int?
   durationMs  Int?
+  /// Source photos only: facial traits that stay recognisable at any age (computed once by the AI provider).
+  faceTraits  String?
   createdAt   DateTime  @default(now())
   deletedAt   DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  portraitsFromSource AgedPortrait[] @relation("PortraitSource")
+  portraitImage       AgedPortrait?  @relation("PortraitImage")
 
   sourceForMoments Moment[]        @relation("MomentSourcePhoto")
   photoForMoment   Moment?         @relation("MomentPhoto")
@@ -237,6 +245,24 @@ model MediaAsset {
   jobOutputs       GenerationJob[] @relation("JobOutput")
 
   @@index([userId, kind])
+}
+
+/// Portrait of the user at `targetAge` made from one source photo; a new source photo gets new portraits.
+model AgedPortrait {
+  id            String   @id @default(cuid())
+  userId        String
+  sourceAssetId String
+  targetAge     Int
+  assetId       String   @unique
+  /// Image model that made the portrait.
+  model         String
+  createdAt     DateTime @default(now())
+
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source MediaAsset @relation("PortraitSource", fields: [sourceAssetId], references: [id], onDelete: Cascade)
+  asset  MediaAsset @relation("PortraitImage", fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([sourceAssetId, targetAge])
 }
 
 // ---------------------------------------------------------------------------

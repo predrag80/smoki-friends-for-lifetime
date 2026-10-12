@@ -50,8 +50,8 @@ export function MomentFrame({ period, currentAge, hasPhoto, moment, onOpen }: Mo
         {moment?.pending ? (
           <div className={styles.pending} role="status">
             <span className={styles.pulse} aria-hidden="true" />
-            <p>{s.pending}</p>
-            <p className={styles.frameNote}>{s.pendingHint}</p>
+            <p>{period === "YESTERDAY" ? s.pendingPast : s.pending}</p>
+            <p className={styles.frameNote}>{period === "YESTERDAY" ? s.pendingPastHint : s.pendingHint}</p>
           </div>
         ) : null}
 
