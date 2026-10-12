@@ -18,6 +18,10 @@ export type PromptInput = {
   agedPortraitReference?: boolean;
   /** Medium close-up so the face is large in the frame (helps likeness for other ages). */
   closeFraming?: boolean;
+  /** The aged portrait is the FIRST reference (exact face); the photo of today is the second (identity details). */
+  portraitPrimary?: boolean;
+  /** Gentle expression and a face turned to the camera: big laughs and profiles distort the features most. */
+  calmExpression?: boolean;
 };
 
 const ORDINALS = ["first", "second", "third", "fourth", "fifth"];
@@ -95,11 +99,23 @@ export function buildPhotoPrompt(input: PromptInput): string {
   const year = momentYear(input.targetAge, input.currentAge, input.now);
   // Reference images: 1 = the person today, then an optional aged portrait, then an optional packshot.
   let next = 2;
-  const portraitPosition = input.agedPortraitReference ? next++ : null;
+  const portraitPosition = input.agedPortraitReference && !input.portraitPrimary ? next++ : null;
+  const todayPosition = input.portraitPrimary ? next++ : null;
   const productPosition = productReference ? next++ : null;
+  const opening = input.portraitPrimary
+    ? [
+        `Create one photorealistic, natural-looking photograph of the person in the first reference image, who is ${input.targetAge} years old there.`,
+        "Their face must be identical to that portrait: same face shape, eyes, eyebrows, nose, mouth, ears and hairline; only the expression, " +
+          "lighting and angle may change.",
+        `The ${ORDINALS[(todayPosition ?? 2) - 1]} reference image shows the same person today, aged ${input.currentAge}; use it only to confirm identity details, ` +
+          "never to make the person look older."
+      ]
+    : [
+        "Create one photorealistic, natural-looking photograph of the same person as in the first reference image.",
+        "Preserve their identity: facial structure, eye colour, skin tone and distinctive features must stay recognisable."
+      ];
   return [
-    "Create one photorealistic, natural-looking photograph of the same person as in the first reference image.",
-    "Preserve their identity: facial structure, eye colour, skin tone and distinctive features must stay recognisable.",
+    ...opening,
     ...(portraitPosition
       ? [
           `The ${ORDINALS[portraitPosition - 1]} reference image shows this same person at age ${input.targetAge}: ` +
@@ -108,6 +124,12 @@ export function buildPhotoPrompt(input: PromptInput): string {
       : []),
     ...(input.identityTraits ? [`Stable facial traits of this person, to keep at any age: ${input.identityTraits}.`] : []),
     ageInstruction(input.targetAge, input.currentAge),
+    ...(input.calmExpression
+      ? [
+          "The person has a gentle, natural smile (no wide open-mouth laugh), eyes open and clearly visible, " +
+            "face towards the camera or at most a slight three-quarter angle, not in profile."
+        ]
+      : []),
     input.closeFraming
       ? "Medium close-up: the person is the main subject in the centre and foreground, the face large in the frame, in sharp focus and well lit; others are partly visible and secondary."
       : "The person is the main subject: in the centre of the frame and in the foreground (never at the edge), in sharp focus, face clearly visible and well lit; everyone else is secondary.",

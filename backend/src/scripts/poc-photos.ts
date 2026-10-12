@@ -28,6 +28,8 @@ import type { PocAttempt, PocPerson, PocRun } from "../modules/poc/results.js";
  *   B  A + stable facial traits + medium close-up
  *   C  B + two steps: first a portrait at the target age, then the scene with that portrait as a reference
  *   D  C with the Pro image model
+ *   E  C with the portrait as the primary reference, a calm expression, a strict check against the portrait and
+ *      a second candidate when that check scores below 7 (the better one is kept)
  * Photos are named `name__1985.jpg` (birth year, optional `-MM` month). Nothing here touches the database or
  * storage; results and the HTML report go to the output folder (ignored by git).
  */
@@ -55,13 +57,34 @@ const env = parseEnv({
   ...(args.location ? { GOOGLE_CLOUD_LOCATION: args.location } : {})
 });
 
-type Variant = { id: string; traits: boolean; close: boolean; portrait: boolean; model?: string; note: string };
+type Variant = {
+  id: string;
+  traits: boolean;
+  close: boolean;
+  portrait: boolean;
+  portraitPrimary?: boolean;
+  calm?: boolean;
+  /** Generate a second candidate when the strict portrait score is below this value. */
+  retryBelow?: number;
+  model?: string;
+  note: string;
+};
 
 const VARIANTS: Record<string, Variant> = {
   A: { id: "A", traits: false, close: false, portrait: false, note: "sadašnji prompt" },
   B: { id: "B", traits: true, close: true, portrait: false, note: "+ crte lica + krupniji kadar" },
   C: { id: "C", traits: true, close: true, portrait: true, note: "+ portret u ciljanim godinama (2 koraka)" },
-  D: { id: "D", traits: true, close: true, portrait: true, model: args["pro-model"], note: "C sa Pro modelom" }
+  D: { id: "D", traits: true, close: true, portrait: true, model: args["pro-model"], note: "C sa Pro modelom" },
+  E: {
+    id: "E",
+    traits: true,
+    close: true,
+    portrait: true,
+    portraitPrimary: true,
+    calm: true,
+    retryBelow: 7,
+    note: "C + portret kao glavna referenca + smiren izraz + bolja od 2 ako je sličnost sa portretom < 7"
+  }
 };
 
 function createProvider(): AiProvider {
@@ -106,7 +129,7 @@ async function main() {
   const provider = createProvider();
   const productImage = args.product ? await loadProductReference(resolve(args.product)) : undefined;
   const variants = args.variants.split(",").map((id) => id.trim().toUpperCase()).filter(Boolean);
-  for (const id of variants) if (!VARIANTS[id]) throw new Error(`Unknown variant ${id} (use A,B,C,D)`);
+  for (const id of variants) if (!VARIANTS[id]) throw new Error(`Unknown variant ${id} (use A,B,C,D,E)`);
   const periods = args.periods.split(",").map((period) => period.trim().toUpperCase()) as LifePeriod[];
   for (const period of periods) if (!lifePeriods.includes(period)) throw new Error(`Unknown period ${period}`);
   const judge = !args["no-judge"];
@@ -184,7 +207,8 @@ async function main() {
     // Step 1 portraits, made once per (variant, age) and reused for every scene of that age.
     const portraits = new Map<string, ImageInput | null>();
     const portraitFor = async (variant: Variant, targetAge: number): Promise<ImageInput | null> => {
-      const key = `${variant.id}-${targetAge}`;
+      // Shared by every variant using the same model (C and E compare only the scene step).
+      const key = `${variant.model ? variant.id : "osnovni"}-${targetAge}`;
       if (portraits.has(key)) return portraits.get(key)!;
       const started = Date.now();
       const result = await withRetries(`${parsed.name} portrait ${key}`, () =>
@@ -197,13 +221,13 @@ async function main() {
         })
       );
       if (!result.value) {
-        person.portraits!.push({ variant: variant.id, targetAge, status: "error", detail: describeError(result.error).detail, ms: Date.now() - started });
+        person.portraits!.push({ variant: key.split("-")[0], targetAge, status: "error", detail: describeError(result.error).detail, ms: Date.now() - started });
         portraits.set(key, null);
         return null;
       }
       const file = `${folder}/portrait-${key}.${extensionFor(result.value.mimeType)}`;
       await writeFile(join(outDir, file), result.value.image);
-      person.portraits!.push({ variant: variant.id, targetAge, status: "ok", file, ms: Date.now() - started });
+      person.portraits!.push({ variant: key.split("-")[0], targetAge, status: "ok", file, ms: Date.now() - started });
       const image = { data: result.value.image, mimeType: result.value.mimeType };
       portraits.set(key, image);
       return image;
@@ -213,12 +237,38 @@ async function main() {
     for (const item of cases) {
       for (const id of variants) {
         const variant = VARIANTS[id];
-        const attempt = await generateCase({ provider, variant, item, currentAge, sourceImage, productImage, person, portraitFor });
-        if (attempt.status === "ok" && judge && attempt.imageData) {
-          const score = await withRetries(`${parsed.name} judge ${attempt.id}`, () =>
-            provider.rateLikeness({ reference: sourceImage, generated: attempt.imageData!, targetAge: item.targetAge, currentAge })
+        const caseOptions = { provider, variant, item, currentAge, sourceImage, productImage, person, portraitFor };
+        let attempt = await generateCase(caseOptions);
+        const portrait = variant.portrait ? await portraitFor(variant, item.targetAge) : null;
+        const scoreImage = async (image: ImageInput) => {
+          const today = await withRetries(`${parsed.name} judge ${attempt.id}`, () =>
+            provider.rateLikeness({ reference: sourceImage, generated: image, targetAge: item.targetAge, currentAge })
           );
-          attempt.result.likeness = score.value;
+          const vsPortrait = portrait
+            ? await withRetries(`${parsed.name} judge-portrait ${attempt.id}`, () =>
+                provider.rateLikeness({ reference: portrait, generated: image, targetAge: item.targetAge, currentAge: item.targetAge })
+              )
+            : null;
+          return { likeness: today.value, portraitLikeness: vsPortrait?.value };
+        };
+        if (attempt.status === "ok" && judge && attempt.imageData) {
+          let scores = await scoreImage(attempt.imageData);
+          attempt.result.candidates = 1;
+          if (variant.retryBelow && scores.portraitLikeness !== undefined && scores.portraitLikeness < variant.retryBelow) {
+            console.log(`  ${parsed.name} ${attempt.id}: portrait likeness ${scores.portraitLikeness}/10, trying a second candidate`);
+            const second = await generateCase(caseOptions);
+            if (second.status === "ok" && second.imageData) {
+              const secondScores = await scoreImage(second.imageData);
+              if ((secondScores.portraitLikeness ?? 0) > (scores.portraitLikeness ?? 0)) {
+                second.result.ms += attempt.result.ms;
+                attempt = second;
+                scores = secondScores;
+              }
+            }
+            attempt.result.candidates = 2;
+          }
+          attempt.result.likeness = scores.likeness;
+          attempt.result.portraitLikeness = scores.portraitLikeness;
         }
         if (attempt.imageData) {
           attempt.result.imageFile = `${folder}/${attempt.id}.${extensionFor(attempt.imageData.mimeType)}`;
@@ -228,7 +278,8 @@ async function main() {
         const r = attempt.result;
         console.log(
           `  ${parsed.name} ${r.id}: ${r.status}${r.code ? ` (${r.code} ${r.detail ?? ""})` : ""} ${(r.ms / 1000).toFixed(1)}s` +
-            (r.likeness ? ` likeness ${r.likeness}/10` : "")
+            (r.likeness ? ` likeness ${r.likeness}/10` : "") +
+            (r.portraitLikeness ? ` vs portrait ${r.portraitLikeness}/10` : "")
         );
         await persist();
       }
@@ -253,6 +304,7 @@ async function generateCase(options: {
   const { provider, variant, item, currentAge, sourceImage, productImage, person } = options;
   const id = `${variant.id}-${item.period}-${item.targetAge}-${item.scene.id}`;
   const portrait = variant.portrait ? await options.portraitFor(variant, item.targetAge) : null;
+  const portraitFirst = Boolean(portrait && variant.portraitPrimary);
   const prompt = buildPhotoPrompt({
     scenePrompt: item.scene.prompt,
     territory: item.scene.territory,
@@ -263,7 +315,9 @@ async function generateCase(options: {
     productPlacement: item.scene.productPlacement,
     identityTraits: variant.traits ? person.traits : undefined,
     closeFraming: variant.close,
-    agedPortraitReference: Boolean(portrait)
+    agedPortraitReference: Boolean(portrait),
+    portraitPrimary: portraitFirst,
+    calmExpression: variant.calm
   });
   const base = {
     id,
@@ -278,9 +332,10 @@ async function generateCase(options: {
   const started = Date.now();
   const result = await withRetries(`${person.name} ${id}`, () =>
     provider.generatePhoto({
-      sourceImage: sourceImage.data,
-      sourceMimeType: sourceImage.mimeType,
-      personReferences: portrait ? [portrait] : undefined,
+      // E sends the portrait first (exact face) and today's photo second; C sends them the other way round.
+      sourceImage: portraitFirst ? portrait!.data : sourceImage.data,
+      sourceMimeType: portraitFirst ? portrait!.mimeType : sourceImage.mimeType,
+      personReferences: portrait ? [portraitFirst ? sourceImage : portrait] : undefined,
       productImage,
       model: variant.model,
       prompt,

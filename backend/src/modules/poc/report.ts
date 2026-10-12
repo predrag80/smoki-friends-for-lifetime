@@ -28,7 +28,7 @@ function card(personName: string, item: PocAttempt): string {
   return `<article class="card ${item.status}" data-period="${item.period}">
   <div class="media">${media}</div>
   <div class="meta">${item.variant ? `<span class="badge">Varijanta ${esc(item.variant)}</span>` : ""}<b>${periodLabel[item.period]} · ${item.targetAge} god.</b><span>${esc(item.sceneTitle)}</span>
-  <small>${item.status === "ok" ? seconds(item.ms / 1000) : ""}${item.attempts > 1 ? ` · ${item.attempts} pokušaja` : ""}${item.likeness ? ` · AI sličnost <b>${item.likeness}/10</b>` : ""}</small></div>
+  <small>${item.status === "ok" ? seconds(item.ms / 1000) : ""}${item.attempts > 1 ? ` · ${item.attempts} pokušaja` : ""}${item.likeness ? ` · AI sličnost <b>${item.likeness}/10</b>` : ""}${item.portraitLikeness ? ` · sa portretom <b>${item.portraitLikeness}/10</b>` : ""}${item.candidates && item.candidates > 1 ? ` · bolja od ${item.candidates}` : ""}</small></div>
   ${item.status === "ok"
     ? `<div class="rate">${rating("identity", "Lice")}${rating("realism", "Realizam")}${rating("smoki", "Smoki")}
   <label class="wide">Greške / napomena<input data-key="${esc(key)}" data-field="note" placeholder="ruke, tekst, lica u pozadini…"></label></div>`
@@ -119,8 +119,8 @@ details{padding:0 12px 10px;font-size:12px;color:#6b5a50}
 <h1>Probni test generisanja</h1>
 <p class="sub">Run ${esc(run.runId)} · provajder ${esc(run.provider)} · model ${esc(run.imageModel)} · region ${esc(run.location)} · pakovanje: ${run.productReference ? esc(run.productReference) : "bez reference"} · ${run.people.length} osoba · ${esc(run.startedAt)}${run.finishedAt ? ` – ${esc(run.finishedAt)}` : " (u toku)"}</p>
 <div class="summary">
-${compare ? `<div><h3>Poređenje varijanti</h3><table><tr><th>Varijanta</th><th>Opis</th><th>Uspeh</th><th>AI sličnost</th><th>Prosek vremena</th></tr>
-${vStats.map((row) => `<tr><td><b>${esc(row.variant)}</b></td><td>${esc(run.variantNotes?.[row.variant] ?? "")}</td><td>${row.ok}/${row.total}</td><td><b>${row.avgLikeness === null ? "–" : row.avgLikeness.toFixed(1)}</b> / 10</td><td>${seconds(row.avgSeconds)}</td></tr>`).join("")}
+${compare ? `<div><h3>Poređenje varijanti</h3><table><tr><th>Varijanta</th><th>Opis</th><th>Uspeh</th><th>AI sličnost (sa današnjom)</th><th>AI sličnost (sa portretom, strogo)</th><th>Prosek vremena</th></tr>
+${vStats.map((row) => `<tr><td><b>${esc(row.variant)}</b></td><td>${esc(run.variantNotes?.[row.variant] ?? "")}</td><td>${row.ok}/${row.total}</td><td><b>${row.avgLikeness === null ? "–" : row.avgLikeness.toFixed(1)}</b> / 10</td><td><b>${row.avgPortraitLikeness === null ? "–" : row.avgPortraitLikeness.toFixed(1)}</b> / 10</td><td>${seconds(row.avgSeconds)}</td></tr>`).join("")}
 </table><p class="sub">Vreme kod C i D ne uključuje portret (korak 1), koji se pravi jednom po uzrastu i ponovo koristi.</p></div>` : ""}
 <div><h3>Rezultat po periodu</h3><table><tr><th>Period</th><th>Pokušaja</th><th>Uspeh</th><th>Blok.</th><th>Greške</th><th>Prosek</th><th>p95</th></tr>
 ${stats.map((row) => `<tr><td>${periodLabel[row.period]}</td><td>${row.total}</td><td><b>${pct(row.successRate)}</b></td><td>${row.blocked}</td><td>${row.errors}</td><td>${seconds(row.avgSeconds)}</td><td>${seconds(row.p95Seconds)}</td></tr>`).join("")}

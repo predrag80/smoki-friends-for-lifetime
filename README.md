@@ -87,7 +87,8 @@ timings and per-image ratings (exported as CSV). Options: `--provider mock|gemin
 (requires ffmpeg).
 Likeness experiment: `--variants A,B,C,D --periods YESTERDAY` generates the same scenes with the current
 prompt (A), with stable facial traits and closer framing (B), in two steps via a portrait at the target age (C)
-and C with the Pro model (D, `--pro-model …`); every image gets an automatic 1–10 likeness score (`--no-judge`
+C with the Pro model (D, `--pro-model …`) and E (portrait as the primary reference, calm expression, strict
+check against the portrait, best of two below 7); every image gets an automatic 1–10 likeness score (`--no-judge`
 to skip). The `poc/` folder holds personal data and is ignored by git; nothing touches the
 database or storage.
 

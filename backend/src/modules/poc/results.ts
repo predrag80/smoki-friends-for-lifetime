@@ -4,8 +4,12 @@ export type PocAttempt = {
   id: string;
   /** Comparison variant (A–D); absent in single-variant runs. */
   variant?: string;
-  /** Automatic 1–10 likeness score from the check model. */
+  /** Automatic 1–10 likeness score from the check model (against the photo of today). */
   likeness?: number;
+  /** Strict 1–10 score against the aged portrait (variants with a portrait). */
+  portraitLikeness?: number;
+  /** Number of scene candidates generated (best-of-2 keeps the better one). */
+  candidates?: number;
   period: LifePeriod;
   targetAge: number;
   sceneId: string;
@@ -105,6 +109,7 @@ export type VariantStats = {
   ok: number;
   successRate: number;
   avgLikeness: number | null;
+  avgPortraitLikeness: number | null;
   avgSeconds: number | null;
 };
 
@@ -122,6 +127,7 @@ export function variantStats(run: PocRun): VariantStats[] {
       ok: ok.length,
       successRate: items.length ? ok.length / items.length : 0,
       avgLikeness: average(ok.flatMap((item) => (item.likeness ? [item.likeness] : []))),
+      avgPortraitLikeness: average(ok.flatMap((item) => (item.portraitLikeness ? [item.portraitLikeness] : []))),
       avgSeconds: average(ok.map((item) => item.ms / 1000))
     };
   });

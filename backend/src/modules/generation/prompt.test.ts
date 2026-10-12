@@ -67,3 +67,15 @@ test("the aged portrait prompt is a neutral face study in the right year", () =>
   assert.match(prompt, /typical for 1988/);
   assert.match(prompt, /plain light grey background/);
 });
+
+test("with the portrait as primary reference the photo of today becomes the second image", () => {
+  const prompt = buildPhotoPrompt({
+    ...base, targetAge: 8, currentAge: 46, agedPortraitReference: true, portraitPrimary: true, calmExpression: true, productReference: true
+  });
+  assert.match(prompt, /person in the first reference image, who is 8 years old there/);
+  assert.match(prompt, /must be identical to that portrait/);
+  assert.match(prompt, /second reference image shows the same person today, aged 46/);
+  assert.match(prompt, /third reference image shows a snack package/);
+  assert.match(prompt, /gentle, natural smile/);
+  assert.doesNotMatch(prompt, /reference image shows this same person at age 8/);
+});

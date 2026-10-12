@@ -49,6 +49,7 @@ test("variant stats average likeness over successful images only", async () => {
     variants: ["A", "C"],
     people: [{ name: "a", currentAge: 40, faceCheck: "ok", attempts: [ok("A", 4, 10000), ok("A", 6, 20000), ok("C", 8, 30000), { ...attempt("YESTERDAY", "blocked", 0), variant: "C" }] }]
   });
+  assert.equal(stats[0].avgPortraitLikeness, null);
   assert.deepEqual(stats.map((row) => [row.variant, row.ok, row.total, row.avgLikeness, row.avgSeconds]), [
     ["A", 2, 2, 5, 15],
     ["C", 1, 2, 8, 30]
