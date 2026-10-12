@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import sharp from "sharp";
 
-import { PhotoRejectedError, prepareSourcePhoto } from "./images.js";
+import { PhotoRejectedError, prepareSourcePhoto, toDeliveryImage } from "./images.js";
 
 function solid(width: number, height: number) {
   return sharp({ create: { width, height, channels: 3, background: { r: 200, g: 120, b: 90 } } });
@@ -32,4 +32,13 @@ test("rejects unsupported formats and unreadable data", async () => {
   const gif = await solid(800, 800).gif().toBuffer();
   await assert.rejects(prepareSourcePhoto(gif, { minDimension: 512 }), { code: "PHOTO_UNSUPPORTED_FORMAT" });
   await assert.rejects(prepareSourcePhoto(Buffer.from("not an image"), { minDimension: 512 }), { code: "PHOTO_UNREADABLE" });
+});
+
+test("generated photos are delivered as WebP of the same size", async () => {
+  const png = await sharp({ create: { width: 896, height: 1200, channels: 3, background: "#c84b31" } }).png().toBuffer();
+  const image = await toDeliveryImage(png);
+  assert.equal(image.contentType, "image/webp");
+  assert.equal(image.width, 896);
+  assert.equal(image.height, 1200);
+  assert.equal((await sharp(image.buffer).metadata()).format, "webp");
 });

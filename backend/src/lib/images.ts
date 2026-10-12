@@ -46,3 +46,14 @@ export async function prepareSourcePhoto(
 
   return { buffer: data, width: info.width, height: info.height, contentType: "image/jpeg" };
 }
+
+export type DeliveryImage = { buffer: Buffer; contentType: "image/webp"; extension: "webp"; width: number; height: number };
+
+/**
+ * Generated photos arrive as ~1.5 MB PNGs; WebP at quality 86 keeps them visually identical at ~5x less,
+ * so the story page loads quickly on mobile. Metadata is not copied.
+ */
+export async function toDeliveryImage(input: Buffer): Promise<DeliveryImage> {
+  const { data, info } = await sharp(input).rotate().webp({ quality: 86, effort: 4 }).toBuffer({ resolveWithObject: true });
+  return { buffer: data, contentType: "image/webp", extension: "webp", width: info.width, height: info.height };
+}

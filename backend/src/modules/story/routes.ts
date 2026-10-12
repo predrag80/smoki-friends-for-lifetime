@@ -291,7 +291,8 @@ export async function storyRoutes(app: FastifyInstance) {
 
     const body = await getObject(asset.storageKey);
     return reply
-      .header("cache-control", "private, max-age=300")
+      // A media id always points to the same file (a new photo gets a new id), so browsers may keep it.
+      .header("cache-control", "private, max-age=31536000, immutable")
       .header("x-content-type-options", "nosniff")
       .type(asset.contentType)
       .send(body);

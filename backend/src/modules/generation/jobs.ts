@@ -4,6 +4,7 @@ import { getAge, GENERATION_WINDOW_MS, sceneCatalog } from "@sffl/shared";
 
 import { getEnv } from "../../config/env.js";
 import { prisma } from "../../lib/prisma.js";
+import { toDeliveryImage } from "../../lib/images.js";
 import { deleteObjects, getObject, mediaKey, putObject } from "../../lib/storage.js";
 import { getProductReference } from "./product-reference.js";
 import { buildPhotoPrompt } from "./prompt.js";
@@ -105,9 +106,9 @@ export async function processPhotoJob(jobId: string, provider: AiProvider, logge
       }
     });
 
-    const extension = result.mimeType === "image/png" ? "png" : "jpg";
-    const storageKey = mediaKey(job.userId, "photo", randomUUID(), extension);
-    await putObject(storageKey, result.image, result.mimeType);
+    const image = await toDeliveryImage(result.image);
+    const storageKey = mediaKey(job.userId, "photo", randomUUID(), image.extension);
+    await putObject(storageKey, image.buffer, image.contentType);
 
     const previousPhotoId = moment.photoAssetId;
     await prisma.$transaction(async (tx) => {
@@ -116,8 +117,10 @@ export async function processPhotoJob(jobId: string, provider: AiProvider, logge
           userId: job.userId,
           kind: "GENERATED_PHOTO",
           storageKey,
-          contentType: result.mimeType,
-          byteSize: result.image.length
+          contentType: image.contentType,
+          byteSize: image.buffer.length,
+          width: image.width,
+          height: image.height
         }
       });
       await tx.moment.update({ where: { id: moment.id }, data: { photoAssetId: asset.id, status: "PHOTO_READY" } });
