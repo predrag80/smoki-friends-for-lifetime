@@ -40,3 +40,17 @@ test("failure reasons are grouped", () => {
     { reason: "BLOCKED: TIMEOUT", count: 1 }
   ]);
 });
+
+test("variant stats average likeness over successful images only", async () => {
+  const { variantStats } = await import("./results.js");
+  const ok = (variant: string, likeness: number, ms: number) => ({ ...attempt("YESTERDAY", "ok", ms), id: `${variant}-${ms}`, variant, likeness });
+  const stats = variantStats({
+    ...run,
+    variants: ["A", "C"],
+    people: [{ name: "a", currentAge: 40, faceCheck: "ok", attempts: [ok("A", 4, 10000), ok("A", 6, 20000), ok("C", 8, 30000), { ...attempt("YESTERDAY", "blocked", 0), variant: "C" }] }]
+  });
+  assert.deepEqual(stats.map((row) => [row.variant, row.ok, row.total, row.avgLikeness, row.avgSeconds]), [
+    ["A", 2, 2, 5, 15],
+    ["C", 1, 2, 8, 30]
+  ]);
+});

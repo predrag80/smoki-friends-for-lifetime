@@ -12,7 +12,15 @@ export type PromptInput = {
   productReference?: boolean;
   /** Reference date for the calendar year of the moment (defaults to now). */
   now?: Date;
+  /** Facial traits that stay recognisable at any age (from describeFace). */
+  identityTraits?: string;
+  /** True when a portrait of the person at the target age is sent right after the source photo. */
+  agedPortraitReference?: boolean;
+  /** Medium close-up so the face is large in the frame (helps likeness for other ages). */
+  closeFraming?: boolean;
 };
+
+const ORDINALS = ["first", "second", "third", "fourth", "fifth"];
 
 const territoryMood: Record<Territory, string> = {
   RELAXING: "calm, cosy and personal",
@@ -73,9 +81,9 @@ function companionsInstruction(targetAge: number): string {
   );
 }
 
-function productInstruction(placement: string | undefined): string {
+function productInstruction(placement: string | undefined, position: number): string {
   return (
-    "The second reference image shows a snack package: reproduce it faithfully (shape, colours, logo and printing), never invent other packaging, " +
+    `The ${ORDINALS[position - 1]} reference image shows a snack package: reproduce it faithfully (shape, colours, logo and printing), never invent other packaging, ` +
     `and place it ${placement ?? "naturally in the scene"}. It is a natural part of the moment, never held up or presented to the camera ` +
     "like an advertisement; the person looks at the others or the scene, not posing with the product."
   );
@@ -85,22 +93,57 @@ function productInstruction(placement: string | undefined): string {
 export function buildPhotoPrompt(input: PromptInput): string {
   const productReference = input.productReference ?? false;
   const year = momentYear(input.targetAge, input.currentAge, input.now);
+  // Reference images: 1 = the person today, then an optional aged portrait, then an optional packshot.
+  let next = 2;
+  const portraitPosition = input.agedPortraitReference ? next++ : null;
+  const productPosition = productReference ? next++ : null;
   return [
     "Create one photorealistic, natural-looking photograph of the same person as in the first reference image.",
     "Preserve their identity: facial structure, eye colour, skin tone and distinctive features must stay recognisable.",
+    ...(portraitPosition
+      ? [
+          `The ${ORDINALS[portraitPosition - 1]} reference image shows this same person at age ${input.targetAge}: ` +
+            "use it as the exact face for this photo, and the first image to keep identity details."
+        ]
+      : []),
+    ...(input.identityTraits ? [`Stable facial traits of this person, to keep at any age: ${input.identityTraits}.`] : []),
     ageInstruction(input.targetAge, input.currentAge),
-    "The person is the main subject: in the centre of the frame and in the foreground (never at the edge), in sharp focus, face clearly visible and well lit; everyone else is secondary.",
+    input.closeFraming
+      ? "Medium close-up: the person is the main subject in the centre and foreground, the face large in the frame, in sharp focus and well lit; others are partly visible and secondary."
+      : "The person is the main subject: in the centre of the frame and in the foreground (never at the edge), in sharp focus, face clearly visible and well lit; everyone else is secondary.",
     "Dress the person in everyday clothes that fit the scene, the season, their age and the year; do not copy the clothing or any printed text from the reference photo.",
     `Scene: ${input.scenePrompt}.`,
     eraInstruction(input.period, year),
     companionsInstruction(input.targetAge),
     `Mood: ${territoryMood[input.territory]}.`,
-    ...(productReference ? [productInstruction(input.productPlacement)] : []),
+    ...(productPosition ? [productInstruction(input.productPlacement, productPosition)] : []),
     "Other people in the scene are fictional and must not resemble real or famous people.",
     "No logos or brand names on drinks, food, clothing, devices or anywhere else" +
       (productReference ? " (except the snack package from the reference image)" : "") +
       "; drinks are in plain glasses or unlabelled bottles.",
     "Neutral decorative text in the local language that belongs to the scene (for example a birthday banner) is allowed; no captions, watermarks or other text.",
     "3:4 portrait framing. Family-friendly."
+  ].join(" ");
+}
+
+/**
+ * Step 1 of two-step generation: a neutral portrait of the person at the target age, so the model spends all its
+ * effort on the face. The portrait is then sent as a reference for the scene.
+ */
+export function buildAgedPortraitPrompt(input: {
+  targetAge: number;
+  currentAge: number;
+  identityTraits?: string;
+  now?: Date;
+}): string {
+  const year = momentYear(input.targetAge, input.currentAge, input.now);
+  return [
+    "Create one photorealistic head-and-shoulders portrait of the same person as in the reference image.",
+    "Preserve their identity: facial structure, eye shape and colour, nose, ears, skin tone and distinctive marks must stay recognisable.",
+    ...(input.identityTraits ? [`Stable facial traits of this person, to keep at any age: ${input.identityTraits}.`] : []),
+    ageInstruction(input.targetAge, input.currentAge),
+    `Hairstyle and simple plain clothing typical for ${year} in ${REGION}.`,
+    "Facing the camera, relaxed natural expression, plain light grey background, soft even daylight, sharp focus.",
+    "No text, logos or other people. Family-friendly."
   ].join(" ");
 }

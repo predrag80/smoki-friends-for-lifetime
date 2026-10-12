@@ -4,15 +4,15 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 
-import { getAge } from "@sffl/shared";
+import { getAge, lifePeriods, type LifePeriod } from "@sffl/shared";
 
 import { parseEnv } from "../config/env.js";
 import { PhotoRejectedError, prepareSourcePhoto } from "../lib/images.js";
-import { buildPhotoPrompt } from "../modules/generation/prompt.js";
+import { loadProductReference } from "../modules/generation/product-reference.js";
+import { buildAgedPortraitPrompt, buildPhotoPrompt } from "../modules/generation/prompt.js";
 import { createGeminiProvider } from "../modules/generation/providers/gemini.js";
 import { createMockProvider } from "../modules/generation/providers/mock.js";
-import { loadProductReference } from "../modules/generation/product-reference.js";
-import { ProviderError, type AiProvider, type GeneratePhotoInput } from "../modules/generation/providers/types.js";
+import { ProviderError, type AiProvider, type GeneratePhotoInput, type ImageInput } from "../modules/generation/providers/types.js";
 import { nextRetryDelay } from "../modules/generation/retry.js";
 import { parsePhotoName, planCases, type PocCase } from "../modules/poc/plan.js";
 import { buildReport } from "../modules/poc/report.js";
@@ -20,11 +20,16 @@ import type { PocAttempt, PocPerson, PocRun } from "../modules/poc/results.js";
 
 /**
  * Proof-of-concept run against the real image model.
- *   npm run poc:photos -w @sffl/backend -- [--provider gemini|mock] [--photos ../poc/photos]
- *       [--out ../poc/results] [--people 3] [--concurrency 1] [--model …] [--location …]
- *       [--product ../poc/smoki-pack.png]
- * Photos are named `name__1985.jpg` (birth year, optional `-MM` month). Nothing here touches the
- * database or storage; results and the HTML report go to the output folder (ignored by git).
+ *   npm run poc:photos -w @sffl/backend -- [--provider gemini|mock] [--photos ../poc/photos] [--out ../poc/results]
+ *       [--people 3] [--periods YESTERDAY,TODAY,SOMEDAY] [--variants A,B,C,D] [--pro-model gemini-3-pro-image]
+ *       [--model …] [--location …] [--product ../poc/smoki-pack.png] [--no-judge] [--skip-face-check]
+ * Variants (likeness experiment):
+ *   A  current app prompt
+ *   B  A + stable facial traits + medium close-up
+ *   C  B + two steps: first a portrait at the target age, then the scene with that portrait as a reference
+ *   D  C with the Pro image model
+ * Photos are named `name__1985.jpg` (birth year, optional `-MM` month). Nothing here touches the database or
+ * storage; results and the HTML report go to the output folder (ignored by git).
  */
 const { values: args } = parseArgs({
   options: {
@@ -32,10 +37,13 @@ const { values: args } = parseArgs({
     photos: { type: "string", default: "../poc/photos" },
     out: { type: "string", default: "../poc/results" },
     people: { type: "string" },
-    concurrency: { type: "string", default: "1" },
+    periods: { type: "string", default: "YESTERDAY,TODAY,SOMEDAY" },
+    variants: { type: "string", default: "A" },
+    "pro-model": { type: "string", default: "gemini-3-pro-image" },
     product: { type: "string" },
     model: { type: "string" },
     location: { type: "string" },
+    "no-judge": { type: "boolean", default: false },
     "skip-face-check": { type: "boolean", default: false }
   }
 });
@@ -47,6 +55,15 @@ const env = parseEnv({
   ...(args.location ? { GOOGLE_CLOUD_LOCATION: args.location } : {})
 });
 
+type Variant = { id: string; traits: boolean; close: boolean; portrait: boolean; model?: string; note: string };
+
+const VARIANTS: Record<string, Variant> = {
+  A: { id: "A", traits: false, close: false, portrait: false, note: "sadašnji prompt" },
+  B: { id: "B", traits: true, close: true, portrait: false, note: "+ crte lica + krupniji kadar" },
+  C: { id: "C", traits: true, close: true, portrait: true, note: "+ portret u ciljanim godinama (2 koraka)" },
+  D: { id: "D", traits: true, close: true, portrait: true, model: args["pro-model"], note: "C sa Pro modelom" }
+};
+
 function createProvider(): AiProvider {
   if (args.provider === "mock") return createMockProvider({ delayMs: 300, failureRate: 0, faceCheck: "pass" });
   if (env.GEMINI_USE_VERTEX && !env.GOOGLE_CLOUD_PROJECT) throw new Error("Set GOOGLE_CLOUD_PROJECT in backend/.env");
@@ -55,89 +72,49 @@ function createProvider(): AiProvider {
 }
 
 const MAX_ATTEMPTS = 4;
-
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function generate(
-  provider: AiProvider,
-  item: PocCase,
-  currentAge: number,
-  source: Buffer,
-  productImage: GeneratePhotoInput["productImage"],
-  dir: string,
-  file: string
-) {
-  const prompt = buildPhotoPrompt({
-    scenePrompt: item.scene.prompt,
-    territory: item.scene.territory,
-    period: item.period,
-    targetAge: item.targetAge,
-    currentAge,
-    productReference: Boolean(productImage),
-    productPlacement: item.scene.productPlacement
-  });
-  const base: Omit<PocAttempt, "status" | "ms" | "attempts"> = {
-    id: `${item.period}-${item.targetAge}-${item.scene.id}`,
-    period: item.period,
-    targetAge: item.targetAge,
-    sceneId: item.scene.id,
-    sceneTitle: item.scene.title,
-    territory: item.scene.territory,
-    prompt
-  };
-
+/** Calls the provider with quota-aware retries; returns the error instead of throwing. */
+async function withRetries<T>(label: string, task: () => Promise<T>): Promise<{ value?: T; error?: unknown; attempts: number }> {
   for (let attempt = 1; ; attempt += 1) {
-    const started = Date.now();
     try {
-      const result = await provider.generatePhoto({
-        sourceImage: source,
-        sourceMimeType: "image/jpeg",
-        prompt,
-        productImage,
-        label: { sceneTitle: item.scene.title, targetAge: item.targetAge, period: item.period }
-      });
-      const ext = result.mimeType.includes("png") ? "png" : "jpg";
-      const imageFile = `${file}/${base.id}.${ext}`;
-      await writeFile(join(dir, imageFile), result.image);
-      return { ...base, status: "ok", ms: Date.now() - started, attempts: attempt, imageFile } satisfies PocAttempt;
+      return { value: await task(), attempts: attempt };
     } catch (error) {
       const providerError = error instanceof ProviderError ? error : null;
       const retryable = providerError ? providerError.retryable : true;
-      // Quota errors are common on new projects: wait and retry instead of giving up.
-      const attemptsAllowed = providerError?.code === "RATE_LIMITED" ? MAX_ATTEMPTS : 2;
-      if (retryable && attempt < attemptsAllowed) {
-        const wait = nextRetryDelay(error, attempt);
-        console.log(`  ${base.id}: ${providerError?.code ?? "error"}, retry in ${Math.round(wait / 1000)} s`);
-        await sleep(wait);
-        continue;
-      }
-      return {
-        ...base,
-        status: providerError?.code === "BLOCKED" ? "blocked" : "error",
-        code: providerError?.code ?? "UNEXPECTED",
-        detail: providerError?.message ?? (error instanceof Error ? error.message : String(error)),
-        ms: Date.now() - started,
-        attempts: attempt
-      } satisfies PocAttempt;
+      const allowed = providerError?.code === "RATE_LIMITED" ? MAX_ATTEMPTS : 2;
+      if (!retryable || attempt >= allowed) return { error, attempts: attempt };
+      const wait = nextRetryDelay(error, attempt);
+      console.log(`  ${label}: ${providerError?.code ?? "error"}, retry in ${Math.round(wait / 1000)} s`);
+      await sleep(wait);
     }
   }
 }
 
-async function runPool<T>(items: T[], limit: number, worker: (item: T) => Promise<void>) {
-  const queue = [...items];
-  await Promise.all(
-    Array.from({ length: Math.max(1, limit) }, async () => {
-      for (let item = queue.shift(); item !== undefined; item = queue.shift()) await worker(item);
-    })
-  );
+function describeError(error: unknown) {
+  const providerError = error instanceof ProviderError ? error : null;
+  return {
+    status: (providerError?.code === "BLOCKED" ? "blocked" : "error") as "blocked" | "error",
+    code: providerError?.code ?? "UNEXPECTED",
+    detail: providerError?.message ?? (error instanceof Error ? error.message : String(error))
+  };
 }
+
+const extensionFor = (mimeType: string) => (mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg");
 
 async function main() {
   const provider = createProvider();
   const productImage = args.product ? await loadProductReference(resolve(args.product)) : undefined;
+  const variants = args.variants.split(",").map((id) => id.trim().toUpperCase()).filter(Boolean);
+  for (const id of variants) if (!VARIANTS[id]) throw new Error(`Unknown variant ${id} (use A,B,C,D)`);
+  const periods = args.periods.split(",").map((period) => period.trim().toUpperCase()) as LifePeriod[];
+  for (const period of periods) if (!lifePeriods.includes(period)) throw new Error(`Unknown period ${period}`);
+  const judge = !args["no-judge"];
+
   const photosDir = resolve(args.photos);
-  const files = (await readdir(photosDir)).filter((name) => parsePhotoName(name)).sort();
-  const skipped = (await readdir(photosDir)).filter((name) => !name.startsWith(".") && !parsePhotoName(name));
+  const names = await readdir(photosDir);
+  const files = names.filter((name) => parsePhotoName(name)).sort();
+  const skipped = names.filter((name) => !name.startsWith(".") && !parsePhotoName(name));
   if (skipped.length) console.warn(`Skipping (expected name__1985.jpg): ${skipped.join(", ")}`);
   const selected = args.people ? files.slice(0, Number(args.people)) : files;
   if (selected.length === 0) throw new Error(`No photos found in ${photosDir}`);
@@ -152,6 +129,10 @@ async function main() {
     imageModel: args.provider === "mock" ? "mock" : env.GEMINI_IMAGE_MODEL,
     location: env.GEMINI_USE_VERTEX ? env.GOOGLE_CLOUD_LOCATION : "gemini-api",
     productReference: args.product ? args.product.split("/").pop() : undefined,
+    variants,
+    variantNotes: Object.fromEntries(
+      variants.map((id) => [id, VARIANTS[id].note + (VARIANTS[id].model ? ` (${VARIANTS[id].model})` : "")])
+    ),
     startedAt: new Date().toISOString(),
     people: []
   };
@@ -160,21 +141,19 @@ async function main() {
     await writeFile(join(outDir, "report.html"), buildReport(run));
   };
 
-  console.log(`Run ${runId}: ${selected.length} people, provider ${run.provider}, model ${run.imageModel} → ${outDir}`);
+  console.log(`Run ${runId}: ${selected.length} people, variants ${variants.join(",")}, periods ${periods.join(",")} → ${outDir}`);
 
   for (const [index, fileName] of selected.entries()) {
     const parsed = parsePhotoName(fileName)!;
     const currentAge = getAge({ year: parsed.birthYear, month: parsed.birthMonth });
     const folder = `${String(index + 1).padStart(2, "0")}-${parsed.name}`;
     await mkdir(join(outDir, folder), { recursive: true });
-    const person: PocPerson = { name: parsed.name, currentAge, faceCheck: "ok", attempts: [] };
+    const person: PocPerson = { name: parsed.name, currentAge, faceCheck: "ok", attempts: [], portraits: [] };
     run.people.push(person);
 
     let source: Buffer;
     try {
-      const prepared = await prepareSourcePhoto(await readFile(join(photosDir, fileName)), {
-        minDimension: env.PHOTO_MIN_DIMENSION
-      });
+      const prepared = await prepareSourcePhoto(await readFile(join(photosDir, fileName)), { minDimension: env.PHOTO_MIN_DIMENSION });
       source = prepared.buffer;
       person.sourceFile = `${folder}/source.jpg`;
       await writeFile(join(outDir, person.sourceFile), source);
@@ -184,14 +163,11 @@ async function main() {
       await persist();
       continue;
     }
+    const sourceImage: ImageInput = { data: source, mimeType: "image/jpeg" };
 
     if (!args["skip-face-check"]) {
-      try {
-        const check = await provider.checkFace(source, "image/jpeg");
-        if (!check.ok) person.faceCheck = check.reason;
-      } catch (error) {
-        person.faceCheck = `FACE_CHECK_FAILED: ${error instanceof Error ? error.message : String(error)}`;
-      }
+      const check = await withRetries(`${parsed.name} face check`, () => provider.checkFace(source, "image/jpeg"));
+      person.faceCheck = check.value ? (check.value.ok ? "ok" : check.value.reason) : `FACE_CHECK_FAILED: ${describeError(check.error).detail}`;
       if (person.faceCheck !== "ok") {
         console.warn(`${parsed.name}: face check ${person.faceCheck}, skipping`);
         await persist();
@@ -199,21 +175,129 @@ async function main() {
       }
     }
 
-    const cases = planCases(currentAge, index);
-    await runPool(cases, Number(args.concurrency), async (item) => {
-      const result = await generate(provider, item, currentAge, source, productImage, outDir, folder);
-      person.attempts.push(result);
-      console.log(`  ${parsed.name} ${result.id}: ${result.status}${result.code ? ` (${result.code} ${result.detail ?? ""})` : ""} ${(result.ms / 1000).toFixed(1)}s`);
-      await persist();
-    });
-    const order = cases.map((item) => `${item.period}-${item.targetAge}-${item.scene.id}`);
-    person.attempts.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
-    await persist();
+    if (variants.some((id) => VARIANTS[id].traits)) {
+      const traits = await withRetries(`${parsed.name} traits`, () => provider.describeFace(source, "image/jpeg"));
+      person.traits = traits.value ?? "";
+      console.log(`  ${parsed.name} traits: ${person.traits || "(none)"}`);
+    }
+
+    // Step 1 portraits, made once per (variant, age) and reused for every scene of that age.
+    const portraits = new Map<string, ImageInput | null>();
+    const portraitFor = async (variant: Variant, targetAge: number): Promise<ImageInput | null> => {
+      const key = `${variant.id}-${targetAge}`;
+      if (portraits.has(key)) return portraits.get(key)!;
+      const started = Date.now();
+      const result = await withRetries(`${parsed.name} portrait ${key}`, () =>
+        provider.generatePhoto({
+          sourceImage: source,
+          sourceMimeType: "image/jpeg",
+          prompt: buildAgedPortraitPrompt({ targetAge, currentAge, identityTraits: person.traits }),
+          model: variant.model,
+          label: { sceneTitle: "Portret", targetAge, period: "YESTERDAY" }
+        })
+      );
+      if (!result.value) {
+        person.portraits!.push({ variant: variant.id, targetAge, status: "error", detail: describeError(result.error).detail, ms: Date.now() - started });
+        portraits.set(key, null);
+        return null;
+      }
+      const file = `${folder}/portrait-${key}.${extensionFor(result.value.mimeType)}`;
+      await writeFile(join(outDir, file), result.value.image);
+      person.portraits!.push({ variant: variant.id, targetAge, status: "ok", file, ms: Date.now() - started });
+      const image = { data: result.value.image, mimeType: result.value.mimeType };
+      portraits.set(key, image);
+      return image;
+    };
+
+    const cases = planCases(currentAge, index).filter((item) => periods.includes(item.period));
+    for (const item of cases) {
+      for (const id of variants) {
+        const variant = VARIANTS[id];
+        const attempt = await generateCase({ provider, variant, item, currentAge, sourceImage, productImage, person, portraitFor });
+        if (attempt.status === "ok" && judge && attempt.imageData) {
+          const score = await withRetries(`${parsed.name} judge ${attempt.id}`, () =>
+            provider.rateLikeness({ reference: sourceImage, generated: attempt.imageData!, targetAge: item.targetAge, currentAge })
+          );
+          attempt.result.likeness = score.value;
+        }
+        if (attempt.imageData) {
+          attempt.result.imageFile = `${folder}/${attempt.id}.${extensionFor(attempt.imageData.mimeType)}`;
+          await writeFile(join(outDir, attempt.result.imageFile), attempt.imageData.data);
+        }
+        person.attempts.push(attempt.result);
+        const r = attempt.result;
+        console.log(
+          `  ${parsed.name} ${r.id}: ${r.status}${r.code ? ` (${r.code} ${r.detail ?? ""})` : ""} ${(r.ms / 1000).toFixed(1)}s` +
+            (r.likeness ? ` likeness ${r.likeness}/10` : "")
+        );
+        await persist();
+      }
+    }
   }
 
   run.finishedAt = new Date().toISOString();
   await persist();
   console.log(`Done. Open ${join(outDir, "report.html")}`);
+}
+
+async function generateCase(options: {
+  provider: AiProvider;
+  variant: Variant;
+  item: PocCase;
+  currentAge: number;
+  sourceImage: ImageInput;
+  productImage: GeneratePhotoInput["productImage"];
+  person: PocPerson;
+  portraitFor: (variant: Variant, targetAge: number) => Promise<ImageInput | null>;
+}): Promise<{ id: string; status: PocAttempt["status"]; result: PocAttempt; imageData?: ImageInput }> {
+  const { provider, variant, item, currentAge, sourceImage, productImage, person } = options;
+  const id = `${variant.id}-${item.period}-${item.targetAge}-${item.scene.id}`;
+  const portrait = variant.portrait ? await options.portraitFor(variant, item.targetAge) : null;
+  const prompt = buildPhotoPrompt({
+    scenePrompt: item.scene.prompt,
+    territory: item.scene.territory,
+    period: item.period,
+    targetAge: item.targetAge,
+    currentAge,
+    productReference: Boolean(productImage),
+    productPlacement: item.scene.productPlacement,
+    identityTraits: variant.traits ? person.traits : undefined,
+    closeFraming: variant.close,
+    agedPortraitReference: Boolean(portrait)
+  });
+  const base = {
+    id,
+    variant: variant.id,
+    period: item.period,
+    targetAge: item.targetAge,
+    sceneId: item.scene.id,
+    sceneTitle: item.scene.title,
+    territory: item.scene.territory,
+    prompt
+  };
+  const started = Date.now();
+  const result = await withRetries(`${person.name} ${id}`, () =>
+    provider.generatePhoto({
+      sourceImage: sourceImage.data,
+      sourceMimeType: sourceImage.mimeType,
+      personReferences: portrait ? [portrait] : undefined,
+      productImage,
+      model: variant.model,
+      prompt,
+      label: { sceneTitle: `${variant.id} · ${item.scene.title}`, targetAge: item.targetAge, period: item.period }
+    })
+  );
+  const ms = Date.now() - started;
+  if (!result.value) {
+    const failure = describeError(result.error);
+    return { id, status: failure.status, result: { ...base, ...failure, ms, attempts: result.attempts } };
+  }
+  return {
+    id,
+    status: "ok",
+    result: { ...base, status: "ok", ms, attempts: result.attempts },
+    imageData: { data: result.value.image, mimeType: result.value.mimeType }
+  };
 }
 
 main().catch((error) => {

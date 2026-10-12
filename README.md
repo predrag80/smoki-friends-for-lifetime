@@ -84,7 +84,11 @@ the three periods, and writes `poc/results/<run>/report.html` with success rates
 timings and per-image ratings (exported as CSV). Options: `--provider mock|gemini`, `--people N`,
 `--concurrency N`, `--model …`, `--location …`, `--skip-face-check`.
 `npm run poc:living -w @sffl/backend -- ../poc/results/<run>` adds a 6 s "living photo" MP4 per image
-(requires ffmpeg). The `poc/` folder holds personal data and is ignored by git; nothing touches the
+(requires ffmpeg).
+Likeness experiment: `--variants A,B,C,D --periods YESTERDAY` generates the same scenes with the current
+prompt (A), with stable facial traits and closer framing (B), in two steps via a portrait at the target age (C)
+and C with the Pro model (D, `--pro-model …`); every image gets an automatic 1–10 likeness score (`--no-judge`
+to skip). The `poc/` folder holds personal data and is ignored by git; nothing touches the
 database or storage.
 
 ## Production mode locally

@@ -98,6 +98,51 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
  * Gemini through the Gemini API (API key) or Vertex AI (GEMINI_USE_VERTEX=true, Google Cloud credentials).
  * Images are sent inline; nothing is uploaded to the provider's file storage.
  */
+const DESCRIBE_FACE_PROMPT =
+  "Describe the facial traits of the person in this photo that stay recognisable at any age, for an artist who must draw " +
+  "the same person younger or older. Be concrete and short. Do not identify the person and do not guess their name.";
+
+const describeFaceSchema = {
+  type: Type.OBJECT,
+  properties: {
+    faceShape: { type: Type.STRING },
+    eyes: { type: Type.STRING, description: "shape, spacing and colour" },
+    eyebrows: { type: Type.STRING },
+    nose: { type: Type.STRING },
+    mouthAndChin: { type: Type.STRING },
+    ears: { type: Type.STRING },
+    skinTone: { type: Type.STRING },
+    naturalHair: { type: Type.STRING, description: "colour and texture" },
+    distinctiveMarks: { type: Type.STRING, description: "moles, freckles, dimples, scars; or none" }
+  },
+  required: ["faceShape", "eyes", "eyebrows", "nose", "mouthAndChin", "skinTone", "naturalHair", "distinctiveMarks"]
+};
+
+/** Turns the structured description into one prompt sentence. */
+export function formatFaceTraits(traits: Record<string, string | undefined>): string {
+  const labels: Record<string, string> = {
+    faceShape: "face shape",
+    eyes: "eyes",
+    eyebrows: "eyebrows",
+    nose: "nose",
+    mouthAndChin: "mouth and chin",
+    ears: "ears",
+    skinTone: "skin tone",
+    naturalHair: "natural hair",
+    distinctiveMarks: "distinctive marks"
+  };
+  return Object.entries(labels)
+    .map(([key, label]) => (traits[key]?.trim() ? `${label}: ${traits[key]!.trim()}` : null))
+    .filter(Boolean)
+    .join("; ");
+}
+
+const likenessSchema = {
+  type: Type.OBJECT,
+  properties: { score: { type: Type.INTEGER }, reason: { type: Type.STRING } },
+  required: ["score"]
+};
+
 export function createGeminiProvider(env: Env): AiProvider {
   const ai = env.GEMINI_USE_VERTEX
     ? new GoogleGenAI({ vertexai: true, project: env.GOOGLE_CLOUD_PROJECT, location: env.GOOGLE_CLOUD_LOCATION })
@@ -125,12 +170,55 @@ export function createGeminiProvider(env: Env): AiProvider {
       return interpretFaceCheck(parseFaceCheckAnswer(response.text));
     },
 
+    async describeFace(image, mimeType) {
+      const response = await call(
+        ai.models.generateContent({
+          model: env.GEMINI_CHECK_MODEL,
+          contents: [{ inlineData: { mimeType, data: image.toString("base64") } }, { text: DESCRIBE_FACE_PROMPT }],
+          config: { responseMimeType: "application/json", responseSchema: describeFaceSchema, temperature: 0 }
+        }),
+        30000
+      );
+      try {
+        return formatFaceTraits(JSON.parse(response.text ?? "{}") as Record<string, string>);
+      } catch {
+        return "";
+      }
+    },
+
+    async rateLikeness({ reference, generated, targetAge, currentAge }) {
+      const response = await call(
+        ai.models.generateContent({
+          model: env.GEMINI_CHECK_MODEL,
+          contents: [
+            { inlineData: { mimeType: reference.mimeType, data: reference.data.toString("base64") } },
+            { inlineData: { mimeType: generated.mimeType, data: generated.data.toString("base64") } },
+            {
+              text:
+                `Image 1 shows a person today, aged ${currentAge}. Image 2 is a generated photo meant to show the same person at age ${targetAge}. ` +
+                "Rate from 1 to 10 how plausible it is that the main person in image 2 is this same individual at that age, judging stable " +
+                "features (bone structure, eye shape and spacing, nose, ears, distinctive marks), not clothing or setting. " +
+                "10 = unmistakably the same person, 1 = clearly someone else. Do not identify the person."
+            }
+          ],
+          config: { responseMimeType: "application/json", responseSchema: likenessSchema, temperature: 0 }
+        }),
+        30000
+      );
+      const score = Number((JSON.parse(response.text ?? "{}") as { score?: number }).score);
+      if (!Number.isFinite(score)) throw new ProviderError("LIKENESS_INVALID_RESPONSE", true);
+      return Math.min(10, Math.max(1, Math.round(score)));
+    },
+
     async generatePhoto(input) {
       const response = await call(
         ai.models.generateContent({
-          model: env.GEMINI_IMAGE_MODEL,
+          model: input.model ?? env.GEMINI_IMAGE_MODEL,
           contents: [
             { inlineData: { mimeType: input.sourceMimeType, data: input.sourceImage.toString("base64") } },
+            ...(input.personReferences ?? []).map((reference) => ({
+              inlineData: { mimeType: reference.mimeType, data: reference.data.toString("base64") }
+            })),
             ...(input.productImage
               ? [{ inlineData: { mimeType: input.productImage.mimeType, data: input.productImage.data.toString("base64") } }]
               : []),

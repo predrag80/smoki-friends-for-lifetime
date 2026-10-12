@@ -40,3 +40,11 @@ test("an empty face check answer is a refusal, not 'not a photo'", () => {
     isPhoto: true, faceCount: 1, clear: true, obstructed: false
   });
 });
+
+test("face traits become one prompt sentence and skip empty fields", async () => {
+  const { formatFaceTraits } = await import("./gemini.js");
+  assert.equal(
+    formatFaceTraits({ faceShape: "oval", eyes: "brown, deep-set", ears: " ", distinctiveMarks: "mole on left cheek" }),
+    "face shape: oval; eyes: brown, deep-set; distinctive marks: mole on left cheek"
+  );
+});

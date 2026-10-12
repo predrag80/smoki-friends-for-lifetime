@@ -71,6 +71,14 @@ export function createMockProvider(options: MockOptions): AiProvider {
       return options.faceCheck === "pass" ? { ok: true } : { ok: false, reason: "NO_FACE" };
     },
 
+    async describeFace() {
+      return "oval face, brown eyes, straight eyebrows, medium nose (mock)";
+    },
+
+    async rateLikeness() {
+      return Math.round(5 + random() * 4);
+    },
+
     async generatePhoto(input: GeneratePhotoInput) {
       await sleep(options.delayMs);
       if (random() < options.failureRate) {

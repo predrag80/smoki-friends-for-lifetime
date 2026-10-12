@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildPhotoPrompt, momentYear } from "./prompt.js";
+import { buildAgedPortraitPrompt, buildPhotoPrompt, momentYear } from "./prompt.js";
 
 const now = new Date("2026-10-09T12:00:00Z");
 const base = { scenePrompt: "a bench in a park", territory: "SOCIALIZING" as const, period: "YESTERDAY" as const, now };
@@ -45,4 +45,25 @@ test("the product appears only with a packshot reference", () => {
   assert.match(withRef, /second reference image shows a snack package/);
   assert.match(withRef, /place it on the bench/);
   assert.match(withRef, /never held up or presented to the camera/);
+});
+
+test("an aged portrait reference shifts the product to the third image", () => {
+  const prompt = buildPhotoPrompt({ ...base, targetAge: 8, currentAge: 46, agedPortraitReference: true, productReference: true });
+  assert.match(prompt, /second reference image shows this same person at age 8/);
+  assert.match(prompt, /third reference image shows a snack package/);
+});
+
+test("identity traits and close framing are added on request", () => {
+  const prompt = buildPhotoPrompt({ ...base, targetAge: 8, currentAge: 46, identityTraits: "oval face; brown eyes", closeFraming: true });
+  assert.match(prompt, /Stable facial traits of this person, to keep at any age: oval face; brown eyes\./);
+  assert.match(prompt, /Medium close-up/);
+  assert.doesNotMatch(buildPhotoPrompt({ ...base, targetAge: 8, currentAge: 46 }), /Medium close-up|Stable facial traits/);
+});
+
+test("the aged portrait prompt is a neutral face study in the right year", () => {
+  const prompt = buildAgedPortraitPrompt({ targetAge: 8, currentAge: 46, identityTraits: "oval face", now });
+  assert.match(prompt, /head-and-shoulders portrait/);
+  assert.match(prompt, /a child of 8, not an adult/);
+  assert.match(prompt, /typical for 1988/);
+  assert.match(prompt, /plain light grey background/);
 });
