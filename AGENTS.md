@@ -103,6 +103,16 @@ an automatically edited final "Friend for a Lifetime" film.
 - `GenerationJob` is the queue table (status + runAfter + lock) and the source for limits/cost analytics.
 - Scene copy: `SceneTranslation` per locale; missing locales fall back to Serbian.
 - Users can delete their account and all photos/generated media.
+- "Zajednički trenutak" (shared moment, `modules/shared`): unlocks when all three periods have a photo and the
+  user has a username (chosen at registration or on the account page). One per user: a scene from the catalog,
+  everyone at their current age, up to 3 friends invited by email or username (10 invites/day, link valid
+  `INVITE_TTL_HOURS`, default 48; token in the request body, page `/invite?token=`). Each acceptance queues a
+  `SHARED_PHOTO` job with everyone (owner reference first, per-person likeness check, one retry); the owner may
+  regenerate 3×/24 h (`GenerationJob.manual`). Age rule: adults with adults, minors with minors; adult + minor only
+  when the adult's email is the minor's confirmed guardian email; the scene must fit every age. Email invites check
+  the age rule only on acceptance (never reveal whether an address has an account). The photo belongs to the owner
+  and is visible to everyone on it; when someone leaves or deletes the account it is deleted and made again
+  without them. Emails: invite, accepted, photo ready. Inclusion in the final film is still open.
 
 ## Local Development
 - Domains: `app.smoki.local` (Next.js :3100) and `api.smoki.local` (Fastify :4100) through the local nginx
@@ -147,6 +157,7 @@ an automatically edited final "Friend for a Lifetime" film.
 
 ## Open Decisions (from the proposal)
 - Film length and format; final montage length.
+- Whether the shared moment is part of the final film.
 - AI provider for production (recommended: Gemini on Vertex AI); fallback rules.
 - Minimum user age, consents, other people in frame, moderation, retention and deletion.
 - Final translations, timezone for campaign start/end, server/storage capacity.

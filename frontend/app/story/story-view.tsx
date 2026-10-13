@@ -14,6 +14,7 @@ import { errorMessage } from "../lib/messages";
 import { MomentBuilder, type BuilderTarget } from "./moment-builder";
 import { MomentFrame } from "./moment-frame";
 import { PhotoPanel } from "./photo-panel";
+import { SharedSection } from "./shared-section";
 import styles from "./story.module.css";
 
 export function StoryView() {
@@ -27,7 +28,11 @@ export function StoryView() {
     queryFn: () => apiFetch<StoryResponse>("/story"),
     retry: false,
     // Poll while a photo is being generated.
-    refetchInterval: (query) => (query.state.data?.moments.some((moment) => moment.pending) ? 3000 : false)
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      const shared = data ? [data.shared.mine, ...data.shared.joined] : [];
+      return data?.moments.some((moment) => moment.pending) || shared.some((moment) => moment?.pending) ? 3000 : false;
+    }
   });
 
   useEffect(() => {
@@ -86,6 +91,7 @@ export function StoryView() {
                 ))}
               </ol>
             </section>
+            <SharedSection shared={story.data.shared} currentAge={story.data.currentAge} />
           </>
         ) : null}
       </main>
