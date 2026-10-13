@@ -11,6 +11,7 @@ import ui from "../components/ui.module.css";
 import { apiFetch, ApiError, errorCode } from "../lib/api";
 import { errorMessage, format } from "../lib/messages";
 import styles from "./account-view.module.css";
+import { UsernameForm } from "./username-form";
 
 type StepProps = { title: string; done: boolean; children: React.ReactNode };
 
@@ -172,6 +173,8 @@ export function AccountView() {
           </Step>
         </ol>
       </section>
+
+      <UsernameForm current={user.username} />
 
       <section>
         <h2 className={styles.sectionTitle}>{a.profileTitle}</h2>

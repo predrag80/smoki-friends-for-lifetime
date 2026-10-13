@@ -13,6 +13,7 @@ import {
 export type MeSource = {
   id: string;
   email: string;
+  username: string | null;
   emailVerifiedAt: Date | null;
   passwordHash: string | null;
   birthMonth: number;
@@ -35,6 +36,7 @@ export function buildMeResponse(user: MeSource, now: Date = new Date()): MeRespo
     user: {
       id: user.id,
       email: user.email,
+      username: user.username,
       birthMonth: user.birthMonth,
       birthYear: user.birthYear,
       age,

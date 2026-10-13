@@ -2,7 +2,7 @@ import type { AppLocale } from "@sffl/shared";
 
 import type { MailMessage } from "../../lib/mailer.js";
 
-type EmailCopy = {
+export type EmailCopy = {
   subject: string;
   heading: string;
   body: string;
@@ -10,7 +10,7 @@ type EmailCopy = {
   footer: string;
 };
 
-type LocalizedCopy = { [K in AppLocale]?: EmailCopy } & { sr: EmailCopy };
+export type LocalizedCopy = { [K in AppLocale]?: EmailCopy } & { sr: EmailCopy };
 
 /** Serbian copy; other locales fall back to it until client translations arrive. */
 const verifyEmailCopy: LocalizedCopy = {
@@ -58,7 +58,7 @@ const passwordChangedCopy: LocalizedCopy = {
   }
 };
 
-function pickCopy(copies: LocalizedCopy, locale: AppLocale): EmailCopy {
+export function pickCopy(copies: LocalizedCopy, locale: AppLocale): EmailCopy {
   return copies[locale] ?? copies.sr;
 }
 
@@ -71,7 +71,7 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-function render(copy: EmailCopy, link: string, body: string): Pick<MailMessage, "text" | "html"> {
+export function renderEmail(copy: EmailCopy, link: string, body: string): Pick<MailMessage, "text" | "html"> {
   const text = `${copy.heading}\n\n${body}\n\n${copy.cta}: ${link}\n\n${copy.footer}`;
   const html = `<!doctype html>
 <html><body style="margin:0;background:#d0232a;font-family:Arial,Helvetica,sans-serif;">
@@ -94,7 +94,7 @@ function render(copy: EmailCopy, link: string, body: string): Pick<MailMessage, 
 
 export function verifyEmailMessage(locale: AppLocale, to: string, link: string): MailMessage {
   const copy = pickCopy(verifyEmailCopy, locale);
-  return { to, subject: copy.subject, ...render(copy, link, copy.body) };
+  return { to, subject: copy.subject, ...renderEmail(copy, link, copy.body) };
 }
 
 export function guardianConsentMessage(
@@ -105,15 +105,15 @@ export function guardianConsentMessage(
 ): MailMessage {
   const copy = pickCopy(guardianCopy, locale);
   const body = copy.body.replace("{child}", maskedChildEmail);
-  return { to, subject: copy.subject, ...render(copy, link, body) };
+  return { to, subject: copy.subject, ...renderEmail(copy, link, body) };
 }
 
 export function passwordResetMessage(locale: AppLocale, to: string, link: string, minutes: number): MailMessage {
   const copy = pickCopy(passwordResetCopy, locale);
-  return { to, subject: copy.subject, ...render(copy, link, copy.body.replace("{minutes}", String(minutes))) };
+  return { to, subject: copy.subject, ...renderEmail(copy, link, copy.body.replace("{minutes}", String(minutes))) };
 }
 
 export function passwordChangedMessage(locale: AppLocale, to: string, loginLink: string): MailMessage {
   const copy = pickCopy(passwordChangedCopy, locale);
-  return { to, subject: copy.subject, ...render(copy, loginLink, copy.body) };
+  return { to, subject: copy.subject, ...renderEmail(copy, loginLink, copy.body) };
 }

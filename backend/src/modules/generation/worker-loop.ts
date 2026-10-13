@@ -2,7 +2,7 @@ import { hostname } from "node:os";
 
 import { getEnv } from "../../config/env.js";
 import { acquireProviderSlot } from "../../lib/provider-gate.js";
-import { claimNextJob, processPhotoJob, purgeDeletedAccounts, requeueStaleJobs } from "./jobs.js";
+import { claimNextJob, processJob, purgeDeletedAccounts, requeueStaleJobs } from "./jobs.js";
 import { getAiProvider } from "./providers/index.js";
 
 type Logger = { info: (obj: object, msg?: string) => void; error: (obj: object, msg?: string) => void };
@@ -21,7 +21,7 @@ export function startGenerationWorker(logger: Logger): () => Promise<void> {
       if (!(await acquireProviderSlot())) break;
       const jobId = await claimNextJob(workerId);
       if (!jobId) break;
-      const task = processPhotoJob(jobId, provider, logger)
+      const task = processJob(jobId, provider, logger)
         .catch((error: unknown) => logger.error({ err: error, jobId }, "Job crashed"))
         .finally(() => running.delete(task));
       running.add(task);

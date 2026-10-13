@@ -25,6 +25,23 @@ const faceCheckSchema = {
 
 type FaceCheckAnswer = { isPhoto: boolean; faceCount: number; clear: boolean; obstructed: boolean };
 
+/** Question for the likeness judge (1–10 score). */
+function likenessQuestion({ targetAge, currentAge, group }: { targetAge: number; currentAge: number; group: boolean }): string {
+  const intro = group
+    ? `Image 1 is a reference photo of a person aged ${currentAge}. Image 2 is a generated group photo meant to include exactly this person. ` +
+      "Find the person in image 2 who looks most like image 1 and rate only that person: how plausible it is that they are this same individual"
+    : currentAge === targetAge
+      ? `Image 1 is a reference portrait of a person aged ${targetAge}. Image 2 is a generated photo meant to show exactly the same person at the same age. ` +
+        "Be strict: compare face shape, eye shape and spacing, eyebrows, nose, mouth, ears and hairline. " +
+        "Rate from 1 to 10 how plausible it is that the main person in image 2 is this same individual at that age"
+      : `Image 1 shows a person today, aged ${currentAge}. Image 2 is a generated photo meant to show the same person at age ${targetAge}. ` +
+        "Rate from 1 to 10 how plausible it is that the main person in image 2 is this same individual at that age";
+  return (
+    `${intro}, judging stable features (bone structure, eye shape and spacing, nose, ears, distinctive marks), not clothing, expression or setting. ` +
+    "10 = unmistakably the same person, 1 = clearly someone else. Do not identify the person."
+  );
+}
+
 /** Parses the model's JSON answer; an empty or incomplete answer means the model declined to look at the photo. */
 export function parseFaceCheckAnswer(text: string | undefined): FaceCheckAnswer {
   if (!text?.trim()) throw new ProviderError("FACE_CHECK_REFUSED", false, "Empty face check answer");
@@ -186,7 +203,7 @@ export function createGeminiProvider(env: Env): AiProvider {
       }
     },
 
-    async rateLikeness({ reference, generated, targetAge, currentAge }) {
+    async rateLikeness({ reference, generated, targetAge, currentAge, group }) {
       const response = await call(
         ai.models.generateContent({
           model: env.GEMINI_CHECK_MODEL,
@@ -194,14 +211,7 @@ export function createGeminiProvider(env: Env): AiProvider {
             { inlineData: { mimeType: reference.mimeType, data: reference.data.toString("base64") } },
             { inlineData: { mimeType: generated.mimeType, data: generated.data.toString("base64") } },
             {
-              text:
-                (currentAge === targetAge
-                  ? `Image 1 is a reference portrait of a person aged ${targetAge}. Image 2 is a generated photo meant to show exactly the same person at the same age. ` +
-                    "Be strict: compare face shape, eye shape and spacing, eyebrows, nose, mouth, ears and hairline. "
-                  : `Image 1 shows a person today, aged ${currentAge}. Image 2 is a generated photo meant to show the same person at age ${targetAge}. `) +
-                "Rate from 1 to 10 how plausible it is that the main person in image 2 is this same individual at that age, judging stable " +
-                "features (bone structure, eye shape and spacing, nose, ears, distinctive marks), not clothing, expression or setting. " +
-                "10 = unmistakably the same person, 1 = clearly someone else. Do not identify the person."
+              text: likenessQuestion({ targetAge, currentAge, group: group ?? false })
             }
           ],
           config: { responseMimeType: "application/json", responseSchema: likenessSchema, temperature: 0 }

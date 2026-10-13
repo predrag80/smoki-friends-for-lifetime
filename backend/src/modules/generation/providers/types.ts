@@ -29,7 +29,14 @@ export interface AiProvider {
   /** Short description of facial traits that stay recognisable at any age (no identification). */
   describeFace(image: Buffer, mimeType: string): Promise<string>;
   /** 1–10: how plausible it is that `generated` shows the person in `reference` at `targetAge`. */
-  rateLikeness(input: { reference: ImageInput; generated: ImageInput; targetAge: number; currentAge: number }): Promise<number>;
+  rateLikeness(input: {
+    reference: ImageInput;
+    generated: ImageInput;
+    targetAge: number;
+    currentAge: number;
+    /** `generated` is a group photo: rate the person in it who looks most like `reference`. */
+    group?: boolean;
+  }): Promise<number>;
 }
 
 /** Provider failure; `retryable` decides whether the job is retried. */

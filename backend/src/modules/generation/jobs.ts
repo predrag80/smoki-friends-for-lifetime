@@ -6,11 +6,13 @@ import { getEnv } from "../../config/env.js";
 import { prisma } from "../../lib/prisma.js";
 import { toDeliveryImage } from "../../lib/images.js";
 import { deleteObjects, getObject, mediaKey, putObject } from "../../lib/storage.js";
+import { leaveAllSharedMoments } from "../shared/data.js";
 import { getProductReference } from "./product-reference.js";
 import { ensureAgedPortrait, ensureFaceTraits, needsAnotherCandidate } from "./past-moment.js";
 import { buildPhotoPrompt } from "./prompt.js";
 import { ProviderError, type AiProvider } from "./providers/index.js";
 import { nextRetryDelay } from "./retry.js";
+import { processSharedPhotoJob } from "./shared-photo.js";
 
 type Logger = { info: (obj: object, msg?: string) => void; error: (obj: object, msg?: string) => void };
 
@@ -57,6 +59,17 @@ function scenePromptFor(sceneId: string, stored: string | null): string {
 
 function productPlacementFor(sceneId: string): string | undefined {
   return sceneCatalog.find((scene) => scene.id === sceneId)?.productPlacement;
+}
+
+/** Runs a claimed job with the handler for its type. */
+export async function processJob(jobId: string, provider: AiProvider, logger: Logger): Promise<void> {
+  const { type } = await prisma.generationJob.findUniqueOrThrow({ where: { id: jobId }, select: { type: true } });
+  if (type === "SHARED_PHOTO") return processSharedPhotoJob(jobId, provider, logger);
+  if (type === "PHOTO") return processPhotoJob(jobId, provider, logger);
+  await prisma.generationJob.update({
+    where: { id: jobId },
+    data: { status: "CANCELED", finishedAt: new Date(), lockedBy: null, errorCode: "UNSUPPORTED_JOB" }
+  });
 }
 
 export async function processPhotoJob(jobId: string, provider: AiProvider, logger: Logger): Promise<void> {
@@ -240,9 +253,12 @@ export async function purgeDeletedAccounts(logger: Logger, batchSize = 20): Prom
   });
 
   for (const user of users) {
+    // Shared photos of other people that show this user are removed and made again without them.
+    await leaveAllSharedMoments(user.id, logger);
     await deleteObjects(user.mediaAssets.map((asset) => asset.storageKey));
     await prisma.$transaction([
       prisma.generationJob.deleteMany({ where: { userId: user.id } }),
+      prisma.sharedMoment.deleteMany({ where: { ownerId: user.id } }),
       prisma.shareLink.deleteMany({ where: { userId: user.id } }),
       prisma.finalFilm.deleteMany({ where: { userId: user.id } }),
       prisma.moment.deleteMany({ where: { userId: user.id } }),

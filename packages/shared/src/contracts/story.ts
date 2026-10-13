@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { lifePeriods } from "../domain/life-periods.js";
 import { territories } from "../domain/scenes.js";
+import { sharedSectionSchema } from "./shared.js";
 
 /** Reasons a photo can be rejected (technical check or AI face check). */
 export const photoRejectionCodes = [
@@ -74,7 +75,8 @@ export const storyResponseSchema = z.object({
   currentAge: z.number(),
   sourcePhoto: z.object({ id: z.string(), url: z.string() }).nullable(),
   moments: z.array(momentDtoSchema),
-  limits: z.object({ generationsPerPeriodPerDay: z.number() })
+  limits: z.object({ generationsPerPeriodPerDay: z.number() }),
+  shared: sharedSectionSchema
 });
 export type StoryResponse = z.infer<typeof storyResponseSchema>;
 

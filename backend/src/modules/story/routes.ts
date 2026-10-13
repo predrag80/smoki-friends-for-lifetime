@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 
 import {
   createMomentRequestSchema,
-  GENERATION_WINDOW_MS,
   getAge,
   regenerateMomentRequestSchema,
   type StoryResponse
@@ -17,11 +16,13 @@ import { acquireProviderSlot } from "../../lib/provider-gate.js";
 import { getObject, mediaKey, putObject } from "../../lib/storage.js";
 import { loadMe } from "../auth/load-me.js";
 import { getUserId, requireUser } from "../auth/require-user.js";
-import { isDailyCapReached, isEmailAllowed, parseAllowedEmails } from "../generation/guard.js";
+import { aiGuard } from "../generation/ai-guard.js";
+import { isEmailAllowed, parseAllowedEmails } from "../generation/guard.js";
 import { countRecentPhotoJobs } from "../generation/jobs.js";
 import { getAiProvider, ProviderError } from "../generation/providers/index.js";
 import type { FaceCheckResult } from "../generation/providers/types.js";
 import { checkMomentChoice } from "../generation/rules.js";
+import { loadSharedSection } from "../shared/data.js";
 import { mediaUrl, sortMoments, toMomentDto } from "./service.js";
 
 function fail(reply: FastifyReply, status: number, error: string) {
@@ -56,28 +57,8 @@ async function latestSourcePhoto(userId: string) {
 async function loadUser(userId: string) {
   return prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { birthMonth: true, birthYear: true, locale: true, email: true }
+    select: { birthMonth: true, birthYear: true, locale: true, email: true, username: true }
   });
-}
-
-/** Allow-list and server-wide daily cap for real AI generation (see AI_ALLOWED_EMAILS / AI_DAILY_CAP). */
-async function aiGuard(
-  userId: string,
-  options: { checkCap: boolean }
-): Promise<{ status: 403 | 429; code: "AI_NOT_ALLOWED" | "AI_DAILY_CAP_REACHED" } | null> {
-  const env = getEnv();
-  const allowed = parseAllowedEmails(env.AI_ALLOWED_EMAILS);
-  if (allowed.length > 0) {
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
-    if (!user || !isEmailAllowed(user.email, allowed)) return { status: 403, code: "AI_NOT_ALLOWED" };
-  }
-  if (options.checkCap && env.AI_DAILY_CAP > 0) {
-    const generated = await prisma.generationJob.count({
-      where: { type: "PHOTO", createdAt: { gt: new Date(Date.now() - GENERATION_WINDOW_MS) } }
-    });
-    if (isDailyCapReached(generated, env.AI_DAILY_CAP)) return { status: 429, code: "AI_DAILY_CAP_REACHED" };
-  }
-  return null;
 }
 
 export async function storyRoutes(app: FastifyInstance) {
@@ -116,7 +97,8 @@ export async function storyRoutes(app: FastifyInstance) {
       moments: sortMoments(rows).map((row) =>
         toMomentDto(row, { apiUrl: env.API_URL, locale: user.locale, dailyLimit: env.GENERATIONS_PER_PERIOD_PER_DAY })
       ),
-      limits: { generationsPerPeriodPerDay: env.GENERATIONS_PER_PERIOD_PER_DAY }
+      limits: { generationsPerPeriodPerDay: env.GENERATIONS_PER_PERIOD_PER_DAY },
+      shared: await loadSharedSection(userId, user)
     };
   });
 
@@ -282,10 +264,16 @@ export async function storyRoutes(app: FastifyInstance) {
     return reply.code(202).send({ id: moment.id });
   });
 
-  /** Streams a stored file to its owner only. */
+  /** Streams a stored file to its owner (and a shared photo to the friends on it). */
   app.get<{ Params: { id: string } }>("/media/:id", async (request, reply) => {
+    const userId = getUserId(request);
+    // Own files, plus a shared photo for everyone who is on it.
     const asset = await prisma.mediaAsset.findFirst({
-      where: { id: request.params.id, userId: getUserId(request), deletedAt: null }
+      where: {
+        id: request.params.id,
+        deletedAt: null,
+        OR: [{ userId }, { sharedPhotoFor: { participants: { some: { userId } } } }]
+      }
     });
     if (!asset) return fail(reply, 404, "NOT_FOUND");
 

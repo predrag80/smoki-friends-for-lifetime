@@ -1,5 +1,6 @@
 import {
   canOfferMarketing,
+  checkUsername,
   getAge,
   isValidBirth,
   MIN_USER_AGE,
@@ -9,6 +10,7 @@ import {
 
 export type RegistrationInput = {
   email: string;
+  username: string;
   birthMonth: number;
   birthYear: number;
   market: MarketCode;
@@ -20,7 +22,8 @@ export type RegistrationError =
   | "INVALID_BIRTH_DATE"
   | "UNDER_MIN_AGE"
   | "GUARDIAN_EMAIL_REQUIRED"
-  | "GUARDIAN_EMAIL_SAME_AS_USER";
+  | "GUARDIAN_EMAIL_SAME_AS_USER"
+  | "USERNAME_INVALID";
 
 export type RegistrationDecision =
   | { ok: true; age: number; guardianEmail: string | null; marketing: boolean }
@@ -29,6 +32,10 @@ export type RegistrationDecision =
 /** Age gate, guardian requirement and marketing eligibility for a new account. */
 export function evaluateRegistration(input: RegistrationInput, now: Date = new Date()): RegistrationDecision {
   const birth = { month: input.birthMonth, year: input.birthYear };
+
+  if (checkUsername(input.username)) {
+    return { ok: false, error: "USERNAME_INVALID" };
+  }
 
   if (!isValidBirth(birth, now)) {
     return { ok: false, error: "INVALID_BIRTH_DATE" };

@@ -173,3 +173,39 @@ export function buildAgedPortraitPrompt(input: {
     "No text, logos or other people. Family-friendly."
   ].join(" ");
 }
+
+/** "Zajednički trenutak": everyone at their current age, one reference photo per person (in this order). */
+export function buildSharedPhotoPrompt(input: {
+  scenePrompt: string;
+  territory: Territory;
+  /** Current age of each person, in the order of the reference images. */
+  ages: number[];
+  productReference?: boolean;
+  productPlacement?: string;
+}): string {
+  const count = input.ages.length;
+  const productReference = input.productReference ?? false;
+  const people = input.ages
+    .map((age, index) => `the ${ORDINALS[index]} reference image shows person ${index + 1}, aged ${age} (${lifeStage(age)})`)
+    .join("; ");
+  return [
+    `Create one photorealistic, natural-looking photograph of ${count} people together: ${people}.`,
+    `All ${count} people appear exactly once, side by side as one group, each with the face from their own reference image: ` +
+      "same face shape, eyes, eyebrows, nose, mouth, ears, hairline and skin tone. Never merge, swap or average faces, and never add a second copy of anyone.",
+    "Everyone keeps their current age as in their reference image.",
+    "All of them are in the foreground and in sharp focus, faces turned towards the camera or at most a slight three-quarter angle, " +
+      "eyes open and clearly visible, gentle natural smiles; nobody is cut off by the frame or hidden behind someone else.",
+    "Dress everyone in everyday clothes that fit the scene, the season and their age; do not copy the clothing or any printed text from the reference photos.",
+    `Scene: ${input.scenePrompt}.`,
+    eraInstruction("TODAY", new Date().getUTCFullYear()),
+    `Mood: ${territoryMood[input.territory]}, a real moment shared by friends.`,
+    ...(productReference ? [productInstruction(input.productPlacement, count + 1)] : []),
+    "If anyone else is in the scene, they are few, in the background, out of focus, fictional and must not resemble real or famous people.",
+    "No logos, labels or brand names on bottles, cans, drinks, food, clothing, devices or anywhere else" +
+      (productReference ? " (except the snack package from the reference image)" : "") +
+      "; drinks are in plain glasses or plain unlabelled bottles.",
+    "No date stamp or timestamp printed on the photo.",
+    "Neutral decorative text in the local language that belongs to the scene (for example a birthday banner) is allowed; no captions, watermarks or other text.",
+    "3:4 portrait framing. Family-friendly."
+  ].join(" ");
+}

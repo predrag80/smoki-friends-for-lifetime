@@ -25,6 +25,8 @@ const passwordSchema = z.string().min(1).max(PASSWORD_MAX_LENGTH);
 
 /** Profile data collected at registration, for both email/password and Google sign-up. */
 export const profileFieldsSchema = z.object({
+  /** Public name used for inviting friends; validated with checkUsername (422 USERNAME_INVALID). */
+  username: z.string().max(40).transform((value) => value.trim().replace(/^@+/, "").toLowerCase()),
   birthMonth: z.number().int().min(1).max(12),
   birthYear: z.number().int().min(1900).max(2100),
   market: z.enum(marketCodes),
@@ -76,6 +78,7 @@ export const meResponseSchema = z.object({
   user: z.object({
     id: z.string(),
     email: z.string(),
+    username: z.string().nullable(),
     birthMonth: z.number(),
     birthYear: z.number(),
     age: z.number(),

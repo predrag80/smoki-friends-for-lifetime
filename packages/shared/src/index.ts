@@ -5,6 +5,8 @@ export * from "./domain/password.js";
 export * from "./domain/life-periods.js";
 export * from "./domain/scenes.js";
 export * from "./domain/generation.js";
+export * from "./domain/shared-moment.js";
 export * from "./contracts/health.js";
 export * from "./contracts/auth.js";
 export * from "./contracts/story.js";
+export * from "./contracts/shared.js";

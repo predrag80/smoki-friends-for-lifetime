@@ -18,8 +18,27 @@ export class EmailTakenError extends Error {
   }
 }
 
+export class UsernameTakenError extends Error {
+  constructor() {
+    super("USERNAME_TAKEN");
+  }
+}
+
+export async function isUsernameUsed(username: string, exceptUserId?: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({ where: { username }, select: { id: true } });
+  return Boolean(user && user.id !== exceptUserId);
+}
+
+/** True when a unique-constraint error (P2002) is about the username column. */
+export function isUsernameConflict(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") return false;
+  const target = (error.meta as { target?: unknown } | undefined)?.target;
+  return Array.isArray(target) ? target.includes("username") : String(target ?? "").includes("username");
+}
+
 export type NewAccountInput = {
   email: string;
+  username: string;
   passwordHash: string | null;
   emailVerified: boolean;
   birthMonth: number;
@@ -42,6 +61,7 @@ export async function createAccount(input: NewAccountInput): Promise<{ userId: s
     const user = await prisma.user.create({
       data: {
         email: input.email,
+        username: input.username,
         passwordHash: input.passwordHash,
         emailVerifiedAt: input.emailVerified ? new Date() : null,
         birthMonth: input.birthMonth,
@@ -73,6 +93,7 @@ export async function createAccount(input: NewAccountInput): Promise<{ userId: s
     });
     return { userId: user.id, guardianToken };
   } catch (error) {
+    if (isUsernameConflict(error)) throw new UsernameTakenError();
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       throw new EmailTakenError();
     }

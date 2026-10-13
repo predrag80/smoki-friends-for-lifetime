@@ -10,7 +10,7 @@ export class ApiError extends Error {
 }
 
 type ApiOptions = {
-  method?: "GET" | "POST" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: unknown;
   form?: FormData;
   /** Abort after this many milliseconds and fail with code TIMEOUT (used for uploads on slow networks). */

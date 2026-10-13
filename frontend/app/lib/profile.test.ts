@@ -4,10 +4,11 @@ import { test } from "node:test";
 import { deriveProfile, emptyProfile, validateProfile, type ProfileState } from "./profile";
 
 const now = new Date("2026-10-08T10:00:00Z");
-const adult: ProfileState = { ...emptyProfile, birthMonth: "5", birthYear: "1990", market: "SRB", acceptTerms: true, acceptPrivacy: true };
+const adult: ProfileState = { ...emptyProfile, username: "ana_88", birthMonth: "5", birthYear: "1990", market: "SRB", acceptTerms: true, acceptPrivacy: true };
 
 test("an empty profile reports every missing field", () => {
   assert.deepEqual(validateProfile(emptyProfile, deriveProfile(emptyProfile, now)), {
+    username: "usernameRequired",
     birth: "birthRequired",
     market: "marketRequired",
     accept: "acceptRequired"
@@ -16,6 +17,11 @@ test("an empty profile reports every missing field", () => {
 
 test("a complete adult profile has no errors", () => {
   assert.deepEqual(validateProfile(adult, deriveProfile(adult, now)), {});
+});
+
+test("an invalid username is reported on its field", () => {
+  const profile = { ...adult, username: "ana marija" };
+  assert.equal(validateProfile(profile, deriveProfile(profile, now)).username, "USERNAME_INVALID");
 });
 
 test("users younger than 12 are stopped on the birth field", () => {

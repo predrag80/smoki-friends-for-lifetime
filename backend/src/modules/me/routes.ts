@@ -1,18 +1,21 @@
 import {
   canOfferMarketing,
+  checkUsername,
   consentUpdateRequestSchema,
   getAge,
   guardianResendRequestSchema,
-  requiresGuardianConsent
+  requiresGuardianConsent,
+  usernameUpdateRequestSchema
 } from "@sffl/shared";
 import type { FastifyInstance } from "fastify";
 
 import { getEnv } from "../../config/env.js";
 import { prisma } from "../../lib/prisma.js";
-import { rotateGuardianToken, sendGuardianEmail } from "../auth/accounts.js";
+import { isUsernameConflict, isUsernameUsed, rotateGuardianToken, sendGuardianEmail } from "../auth/accounts.js";
 import { loadMe } from "../auth/load-me.js";
 import { getUserId, requireUser } from "../auth/require-user.js";
 import { clearSessionCookie, getRequestMeta } from "../auth/session.js";
+import { leaveAllSharedMoments } from "../shared/data.js";
 
 export async function meRoutes(app: FastifyInstance) {
   app.addHook("preHandler", requireUser);
@@ -49,6 +52,24 @@ export async function meRoutes(app: FastifyInstance) {
       await prisma.consent.updateMany({ where: { userId, type, revokedAt: null }, data: { revokedAt: new Date() } });
     }
 
+    return reply.send(await loadMe(userId));
+  });
+
+  /** Choose or change the public username used for inviting friends. */
+  app.put("/me/username", { config: { rateLimit: { max: 10, timeWindow: "10 minutes" } } }, async (request, reply) => {
+    const parsed = usernameUpdateRequestSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "INVALID_BODY", issues: parsed.error.issues });
+    const { username } = parsed.data;
+    if (checkUsername(username)) return reply.code(422).send({ error: "USERNAME_INVALID" });
+
+    const userId = getUserId(request);
+    if (await isUsernameUsed(username, userId)) return reply.code(409).send({ error: "USERNAME_TAKEN" });
+    try {
+      await prisma.user.update({ where: { id: userId }, data: { username } });
+    } catch (error) {
+      if (isUsernameConflict(error)) return reply.code(409).send({ error: "USERNAME_TAKEN" });
+      throw error;
+    }
     return reply.send(await loadMe(userId));
   });
 
@@ -101,6 +122,9 @@ export async function meRoutes(app: FastifyInstance) {
         }
       })
     ]);
+
+    // Shared photos of friends that show this user are removed right away (the rest is purged by the worker).
+    await leaveAllSharedMoments(userId, request.log);
 
     clearSessionCookie(reply);
     return reply.code(204).send();

@@ -12,6 +12,7 @@ import { guardianRoutes } from "./modules/guardian/routes.js";
 import { healthRoutes } from "./modules/health/routes.js";
 import { meRoutes } from "./modules/me/routes.js";
 import { sceneRoutes } from "./modules/scenes/routes.js";
+import { sharedRoutes } from "./modules/shared/routes.js";
 import { storyRoutes } from "./modules/story/routes.js";
 
 function parseCorsOrigins(value?: string): Set<string> {
@@ -49,7 +50,7 @@ export async function buildServer() {
 
   await app.register(cors, {
     credentials: true,
-    methods: ["GET", "POST", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     origin: (origin, callback) => {
       // Same-origin and server-to-server requests have no Origin header.
       if (!origin || allowedOrigins.has(origin)) {
@@ -82,6 +83,7 @@ export async function buildServer() {
   await app.register(guardianRoutes);
   await app.register(meRoutes);
   await app.register(storyRoutes);
+  await app.register(sharedRoutes);
 
   app.addHook("onClose", async () => {
     await prisma.$disconnect();

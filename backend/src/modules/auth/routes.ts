@@ -17,6 +17,8 @@ import {
   consumeAuthToken,
   createAccount,
   EmailTakenError,
+  UsernameTakenError,
+  isUsernameUsed,
   findAuthToken,
   issueAuthToken,
   sendGuardianEmail,
@@ -77,12 +79,14 @@ export async function authRoutes(app: FastifyInstance) {
 
     const existing = await prisma.user.findUnique({ where: { email: body.email }, select: { id: true } });
     if (existing) return reply.code(409).send({ error: "EMAIL_TAKEN" });
+    if (await isUsernameUsed(body.username)) return reply.code(409).send({ error: "USERNAME_TAKEN" });
 
     const meta = getRequestMeta(request);
     let account: Awaited<ReturnType<typeof createAccount>>;
     try {
       account = await createAccount({
         email: body.email,
+        username: body.username,
         passwordHash: await hashPassword(body.password),
         emailVerified: false,
         birthMonth: body.birthMonth,
@@ -95,6 +99,7 @@ export async function authRoutes(app: FastifyInstance) {
       });
     } catch (error) {
       if (error instanceof EmailTakenError) return reply.code(409).send({ error: "EMAIL_TAKEN" });
+      if (error instanceof UsernameTakenError) return reply.code(409).send({ error: "USERNAME_TAKEN" });
       throw error;
     }
 
@@ -377,6 +382,8 @@ export async function authRoutes(app: FastifyInstance) {
     const payload = oauthSignupPayloadSchema.parse(lookup.token.payload);
     const decision = evaluateRegistration({ ...body, email: payload.email });
     if (!decision.ok) return reply.code(422).send({ error: decision.error });
+    // Check before the one-time token is spent, so the user can pick another name.
+    if (await isUsernameUsed(body.username)) return reply.code(409).send({ error: "USERNAME_TAKEN" });
 
     if (!(await consumeAuthToken(lookup.token.id))) return reply.code(400).send({ error: "INVALID_TOKEN" });
 
@@ -385,6 +392,7 @@ export async function authRoutes(app: FastifyInstance) {
     try {
       account = await createAccount({
         email: payload.email,
+        username: body.username,
         passwordHash: null,
         emailVerified: true,
         birthMonth: body.birthMonth,
@@ -398,6 +406,7 @@ export async function authRoutes(app: FastifyInstance) {
       });
     } catch (error) {
       if (error instanceof EmailTakenError) return reply.code(409).send({ error: "EMAIL_TAKEN" });
+      if (error instanceof UsernameTakenError) return reply.code(409).send({ error: "USERNAME_TAKEN" });
       throw error;
     }
 

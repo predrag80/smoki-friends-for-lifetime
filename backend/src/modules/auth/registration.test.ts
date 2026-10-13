@@ -4,7 +4,14 @@ import { test } from "node:test";
 import { evaluateRegistration } from "./registration.js";
 
 const now = new Date("2026-10-08T10:00:00Z");
-const base = { email: "dete@example.com", market: "SRB" as const, marketingOptIn: true };
+const base = { email: "dete@example.com", username: "dete_13", market: "SRB" as const, marketingOptIn: true };
+
+test("rejects an invalid username", () => {
+  assert.deepEqual(evaluateRegistration({ ...base, username: "a b", birthMonth: 1, birthYear: 1990 }, now), {
+    ok: false,
+    error: "USERNAME_INVALID"
+  });
+});
 
 test("rejects users younger than 12", () => {
   assert.deepEqual(evaluateRegistration({ ...base, birthMonth: 10, birthYear: 2014 }, now), {

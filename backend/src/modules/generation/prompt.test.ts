@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { buildAgedPortraitPrompt, buildPhotoPrompt, momentYear } from "./prompt.js";
+import { buildAgedPortraitPrompt, buildPhotoPrompt, buildSharedPhotoPrompt, momentYear } from "./prompt.js";
 
 const now = new Date("2026-10-09T12:00:00Z");
 const base = { scenePrompt: "a bench in a park", territory: "SOCIALIZING" as const, period: "YESTERDAY" as const, now };
@@ -85,4 +85,26 @@ test("cheering scenes may show joy but keep the face visible; no date stamps", (
   assert.match(cheering, /may cheer and show joy, but the face stays turned towards the camera/);
   assert.doesNotMatch(cheering, /gentle, natural smile/);
   assert.match(cheering, /No date stamp/);
+});
+
+test("the shared photo names every person with their current age and keeps the safety rules", () => {
+  const prompt = buildSharedPhotoPrompt({ scenePrompt: "a bench in a park", territory: "SOCIALIZING", ages: [36, 34, 40] });
+  assert.match(prompt, /3 people together/);
+  assert.match(prompt, /the first reference image shows person 1, aged 36/);
+  assert.match(prompt, /the third reference image shows person 3, aged 40/);
+  assert.match(prompt, /Never merge, swap or average faces/);
+  assert.match(prompt, /must not resemble real or famous people/);
+  assert.doesNotMatch(prompt, /snack package/);
+});
+
+test("the packshot comes right after the people in the shared photo", () => {
+  const prompt = buildSharedPhotoPrompt({
+    scenePrompt: "a bench in a park",
+    territory: "SOCIALIZING",
+    ages: [16, 15],
+    productReference: true,
+    productPlacement: "on the bench"
+  });
+  assert.match(prompt, /The third reference image shows a snack package/);
+  assert.match(prompt, /aged 15 \(a teenager\)/);
 });

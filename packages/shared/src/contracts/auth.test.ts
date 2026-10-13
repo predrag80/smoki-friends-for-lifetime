@@ -6,6 +6,7 @@ import { isValidEmail, registerRequestSchema, resetPasswordRequestSchema } from 
 
 const validRegistration = {
   email: "  Ana@Example.COM ",
+  username: " @Ana_88 ",
   password: "smoki2027",
   birthMonth: 5,
   birthYear: 1990,
@@ -18,6 +19,7 @@ const validRegistration = {
 test("registration normalises the email and defaults marketing to false", () => {
   const parsed = registerRequestSchema.parse(validRegistration);
   assert.equal(parsed.email, "ana@example.com");
+  assert.equal(parsed.username, "ana_88");
   assert.equal(parsed.marketingOptIn, false);
 });
 

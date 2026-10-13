@@ -39,6 +39,16 @@ export function ProfileFields({ value, onChange, errors = {} }: ProfileFieldsPro
 
   return (
     <>
+      <TextField
+        label={f.username}
+        autoComplete="username"
+        maxLength={25}
+        value={value.username}
+        onChange={(next) => set("username", next)}
+        hint={f.usernameHint}
+        error={errors.username}
+      />
+
       <fieldset className={ui.fieldset} aria-describedby={birthError ? "birth-error" : undefined}>
         <legend className={ui.label}>{f.birth}</legend>
         <div className={ui.row}>

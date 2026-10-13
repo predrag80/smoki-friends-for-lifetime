@@ -8,6 +8,7 @@ const now = new Date("2026-10-08T10:00:00Z");
 const minor: MeSource = {
   id: "u1",
   email: "dete@example.com",
+  username: "dete_13",
   emailVerifiedAt: now,
   passwordHash: "scrypt$...",
   birthMonth: 1,

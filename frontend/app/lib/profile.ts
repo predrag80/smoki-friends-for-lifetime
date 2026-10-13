@@ -1,5 +1,7 @@
 import {
   canOfferMarketing,
+  checkUsername,
+  normalizeUsername,
   digitalConsentAgeByMarket,
   getAge,
   isValidBirth,
@@ -13,6 +15,7 @@ import {
 /** Registration profile state and validation, shared by the email and Google sign-up forms. */
 
 export type ProfileState = {
+  username: string;
   birthMonth: string;
   birthYear: string;
   market: MarketCode | "";
@@ -23,6 +26,7 @@ export type ProfileState = {
 };
 
 export const emptyProfile: ProfileState = {
+  username: "",
   birthMonth: "",
   birthYear: "",
   market: "",
@@ -56,11 +60,20 @@ export function deriveProfile(state: ProfileState, now: Date = new Date()): Deri
 }
 
 /** Inline errors per field; values are keys of messages.errors. */
-export type ProfileErrors = Partial<Record<"birth" | "market" | "guardianEmail" | "accept", string>>;
+export type ProfileErrors = Partial<Record<"username" | "birth" | "market" | "guardianEmail" | "accept", string>>;
+
+/** Inline username check; values are keys of messages.errors. */
+export function validateUsername(value: string): string | undefined {
+  if (!value.trim()) return "usernameRequired";
+  return checkUsername(value) ? "USERNAME_INVALID" : undefined;
+}
 
 /** Mirrors the API checks (zod contract + evaluateRegistration) so most errors never reach the server. */
 export function validateProfile(state: ProfileState, derived: DerivedProfile, userEmail?: string): ProfileErrors {
   const errors: ProfileErrors = {};
+
+  const usernameError = validateUsername(state.username);
+  if (usernameError) errors.username = usernameError;
 
   if (!state.birthMonth || !state.birthYear) errors.birth = "birthRequired";
   else if (derived.age === null) errors.birth = "INVALID_BIRTH_DATE";
@@ -84,6 +97,8 @@ export function validateProfile(state: ProfileState, derived: DerivedProfile, us
 
 /** Server error codes that belong to a profile field. */
 export const profileFieldByServerError: Record<string, keyof ProfileErrors> = {
+  USERNAME_INVALID: "username",
+  USERNAME_TAKEN: "username",
   INVALID_BIRTH_DATE: "birth",
   UNDER_MIN_AGE: "birth",
   GUARDIAN_EMAIL_REQUIRED: "guardianEmail",
@@ -92,6 +107,7 @@ export const profileFieldByServerError: Record<string, keyof ProfileErrors> = {
 
 export function toProfilePayload(state: ProfileState, derived: DerivedProfile, locale: AppLocale) {
   return {
+    username: normalizeUsername(state.username),
     birthMonth: Number(state.birthMonth),
     birthYear: Number(state.birthYear),
     market: state.market as MarketCode,

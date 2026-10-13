@@ -81,6 +81,28 @@ enum GenerationJobType {
   PHOTO
   VIDEO
   FINAL_FILM
+  /// Shared moment: one photo with the owner and the friends who accepted.
+  SHARED_PHOTO
+}
+
+enum SharedMomentStatus {
+  WAITING
+  PHOTO_PENDING
+  PHOTO_READY
+  FAILED
+}
+
+enum InviteChannel {
+  EMAIL
+  USERNAME
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  CANCELED
+  EXPIRED
 }
 
 enum GenerationJobStatus {
@@ -105,6 +127,8 @@ model User {
   id              String     @id @default(cuid())
   /// Always stored lowercase. Replaced with a placeholder when the account is deleted.
   email           String     @unique
+  /// Public name for inviting friends; lowercase, unique. Null for accounts made before usernames existed.
+  username        String?    @unique
   emailVerifiedAt DateTime?
   /// scrypt hash; null for accounts that only sign in with Google.
   passwordHash    String?
@@ -129,6 +153,10 @@ model User {
   finalFilm       FinalFilm?
   shareLinks      ShareLink[]
   agedPortraits   AgedPortrait[]
+
+  ownedSharedMoment    SharedMoment?       @relation("SharedOwner")
+  sharedParticipations SharedParticipant[]
+  receivedInvites      SharedInvite[]      @relation("InviteInvitee")
 }
 
 model Session {
@@ -236,6 +264,7 @@ model MediaAsset {
 
   portraitsFromSource AgedPortrait[] @relation("PortraitSource")
   portraitImage       AgedPortrait?  @relation("PortraitImage")
+  sharedPhotoFor      SharedMoment?  @relation("SharedPhoto")
 
   sourceForMoments Moment[]        @relation("MomentSourcePhoto")
   photoForMoment   Moment?         @relation("MomentPhoto")
@@ -282,8 +311,9 @@ model Scene {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  translations SceneTranslation[]
-  moments      Moment[]
+  translations  SceneTranslation[]
+  moments       Moment[]
+  sharedMoments SharedMoment[]
 
   @@index([territory, sortOrder])
 }
@@ -330,39 +360,98 @@ model Moment {
 
 /// Async work item processed by the worker. Also the source for daily limits and cost analytics.
 model GenerationJob {
-  id            String              @id @default(cuid())
-  userId        String
-  type          GenerationJobType
-  status        GenerationJobStatus @default(QUEUED)
-  momentId      String?
-  finalFilmId   String?
-  inputAssetId  String?
-  outputAssetId String?
-  attempts      Int                 @default(0)
-  maxAttempts   Int                 @default(3)
+  id             String              @id @default(cuid())
+  userId         String
+  type           GenerationJobType
+  status         GenerationJobStatus @default(QUEUED)
+  momentId       String?
+  sharedMomentId String?
+  /// Shared photos: true when the owner asked for a new photo (counts towards the daily limit); acceptances are automatic.
+  manual         Boolean             @default(false)
+  finalFilmId    String?
+  inputAssetId   String?
+  outputAssetId  String?
+  attempts       Int                 @default(0)
+  maxAttempts    Int                 @default(3)
   /// Earliest time the worker may (re)try this job.
-  runAfter      DateTime            @default(now())
-  lockedBy      String?
-  lockedAt      DateTime?
-  provider      String?
-  providerJobId String?
-  errorCode     String?
-  errorMessage  String?
+  runAfter       DateTime            @default(now())
+  lockedBy       String?
+  lockedAt       DateTime?
+  provider       String?
+  providerJobId  String?
+  errorCode      String?
+  errorMessage   String?
   /// Provider cost in micro-USD (1 USD = 1_000_000).
-  costMicroUsd  Int?
-  createdAt     DateTime            @default(now())
-  startedAt     DateTime?
-  finishedAt    DateTime?
+  costMicroUsd   Int?
+  createdAt      DateTime            @default(now())
+  startedAt      DateTime?
+  finishedAt     DateTime?
 
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  moment      Moment?     @relation(fields: [momentId], references: [id], onDelete: SetNull)
-  finalFilm   FinalFilm?  @relation(fields: [finalFilmId], references: [id], onDelete: SetNull)
-  inputAsset  MediaAsset? @relation("JobInput", fields: [inputAssetId], references: [id])
-  outputAsset MediaAsset? @relation("JobOutput", fields: [outputAssetId], references: [id])
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moment       Moment?       @relation(fields: [momentId], references: [id], onDelete: SetNull)
+  sharedMoment SharedMoment? @relation(fields: [sharedMomentId], references: [id], onDelete: SetNull)
+  finalFilm    FinalFilm?    @relation(fields: [finalFilmId], references: [id], onDelete: SetNull)
+  inputAsset   MediaAsset?   @relation("JobInput", fields: [inputAssetId], references: [id])
+  outputAsset  MediaAsset?   @relation("JobOutput", fields: [outputAssetId], references: [id])
 
   @@index([status, runAfter])
   @@index([userId, type, createdAt])
   @@index([momentId])
+  @@index([sharedMomentId])
+}
+
+/// "Zajednički trenutak": one photo of the owner with up to three friends who accepted an invite.
+model SharedMoment {
+  id           String             @id @default(cuid())
+  /// One shared moment per user.
+  ownerId      String             @unique
+  sceneId      String
+  status       SharedMomentStatus @default(WAITING)
+  photoAssetId String?            @unique
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  owner        User                @relation("SharedOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  scene        Scene               @relation(fields: [sceneId], references: [id])
+  photoAsset   MediaAsset?         @relation("SharedPhoto", fields: [photoAssetId], references: [id], onDelete: SetNull)
+  participants SharedParticipant[]
+  invites      SharedInvite[]
+  jobs         GenerationJob[]
+}
+
+/// A friend who accepted an invite (the owner is not listed here).
+model SharedParticipant {
+  id             String   @id @default(cuid())
+  sharedMomentId String
+  userId         String
+  joinedAt       DateTime @default(now())
+
+  sharedMoment SharedMoment @relation(fields: [sharedMomentId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sharedMomentId, userId])
+  @@index([userId])
+}
+
+/// Invite link sent by email or to a username. Only the token hash is stored; the email is cleared when it closes.
+model SharedInvite {
+  id             String        @id @default(cuid())
+  sharedMomentId String
+  channel        InviteChannel
+  email          String?
+  inviteeUserId  String?
+  tokenHash      String        @unique
+  status         InviteStatus  @default(PENDING)
+  expiresAt      DateTime
+  createdAt      DateTime      @default(now())
+  respondedAt    DateTime?
+
+  sharedMoment SharedMoment @relation(fields: [sharedMomentId], references: [id], onDelete: Cascade)
+  invitee      User?        @relation("InviteInvitee", fields: [inviteeUserId], references: [id], onDelete: SetNull)
+
+  @@index([sharedMomentId, status])
+  @@index([inviteeUserId, status])
+  @@index([email, status])
 }
 
 /// Automatic montage of the three moment videos (JUČE → DANAS → JEDNOG DANA).
