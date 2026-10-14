@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { getAge, sceneCatalog } from "@sffl/shared";
+import { getAge, sceneCatalog, sharedTargetAge } from "@sffl/shared";
 
 import { getEnv } from "../../config/env.js";
 import { toDeliveryImage } from "../../lib/images.js";
@@ -10,6 +10,7 @@ import { deleteObjects, getObject, mediaKey, putObject } from "../../lib/storage
 import { sharedPhotoReadyMessage } from "../shared/emails.js";
 import { sceneTitle } from "../shared/service.js";
 import { needsAnotherCandidate, weakestScore } from "./likeness.js";
+import { ensureAgedPortrait, ensureFaceTraits } from "./past-moment.js";
 import { getProductReference } from "./product-reference.js";
 import { buildSharedPhotoPrompt } from "./prompt.js";
 import { ProviderError, type AiProvider } from "./providers/index.js";
@@ -63,7 +64,11 @@ export async function processSharedPhotoJob(jobId: string, provider: AiProvider,
 
   try {
     // Owner first, then friends in the order they joined; a friend without a usable photo is left out.
-    const people: { id: string; age: number; photo: ImageInput }[] = [];
+    // For YESTERDAY each person's reference is their portrait at the age on the photo (same two-step idea as
+    // single past moments); for TODAY and SOMEDAY it is today's photo.
+    const portraits = moment.period === "YESTERDAY";
+    const model = provider.name === "mock" ? "mock" : getEnv().GEMINI_IMAGE_MODEL;
+    const people: { id: string; currentAge: number; targetAge: number; reference: ImageInput }[] = [];
     for (const person of [moment.owner, ...friends]) {
       const asset = await prisma.mediaAsset.findFirst({
         where: { userId: person.id, kind: "SOURCE_PHOTO", deletedAt: null },
@@ -74,11 +79,15 @@ export async function processSharedPhotoJob(jobId: string, provider: AiProvider,
         logger.info({ jobId: job.id }, "Friend without a source photo left out of the shared photo");
         continue;
       }
-      people.push({
-        id: person.id,
-        age: getAge({ month: person.birthMonth, year: person.birthYear }),
-        photo: { data: await getObject(asset.storageKey), mimeType: asset.contentType }
-      });
+      const currentAge = getAge({ month: person.birthMonth, year: person.birthYear });
+      const targetAge = sharedTargetAge(currentAge, moment.yearsOffset);
+      const photo = { data: await getObject(asset.storageKey), mimeType: asset.contentType };
+      let reference: ImageInput = photo;
+      if (portraits) {
+        const traits = await ensureFaceTraits(provider, asset, photo);
+        reference = await ensureAgedPortrait({ provider, model, source: asset, image: photo, targetAge, currentAge, traits });
+      }
+      people.push({ id: person.id, currentAge, targetAge, reference });
     }
     const [first, ...others] = people;
     if (!first || others.length === 0) throw new ProviderError("NO_FRIEND_PHOTOS", false);
@@ -89,30 +98,33 @@ export async function processSharedPhotoJob(jobId: string, provider: AiProvider,
     const prompt = buildSharedPhotoPrompt({
       scenePrompt: moment.scene.aiPrompt ?? catalogScene?.prompt ?? moment.sceneId,
       territory: moment.scene.territory,
-      ages: people.map((person) => person.age),
+      period: moment.period,
+      people: people.map(({ currentAge, targetAge }) => ({ currentAge, targetAge })),
+      portraitReferences: portraits,
       productReference: Boolean(productImage),
       productPlacement: catalogScene?.productPlacement
     });
 
     const generate = () =>
       provider.generatePhoto({
-        sourceImage: first.photo.data,
-        sourceMimeType: first.photo.mimeType,
-        personReferences: others.map((person) => person.photo),
+        sourceImage: first.reference.data,
+        sourceMimeType: first.reference.mimeType,
+        personReferences: others.map((person) => person.reference),
         productImage,
         prompt,
-        label: { sceneTitle: title, targetAge: first.age, period: "TODAY" }
+        label: { sceneTitle: title, targetAge: first.targetAge, period: moment.period }
       });
+    // A portrait already shows the age on the photo; today's photo is compared across the years.
     const score = async (image: GeneratedImage) =>
       weakestScore(
         await Promise.all(
           people.map((person) =>
             provider
               .rateLikeness({
-                reference: person.photo,
+                reference: person.reference,
                 generated: { data: image.image, mimeType: image.mimeType },
-                targetAge: person.age,
-                currentAge: person.age,
+                targetAge: person.targetAge,
+                currentAge: portraits ? person.targetAge : person.currentAge,
                 group: true
               })
               .catch(() => null)

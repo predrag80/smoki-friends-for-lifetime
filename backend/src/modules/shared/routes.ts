@@ -1,10 +1,11 @@
 import {
+  chooseSharedYearsOffset,
   createSharedMomentRequestSchema,
+  fitsSharedPhotoAge,
   getAge,
   GENERATION_WINDOW_MS,
   INVITES_PER_DAY,
   inviteFriendRequestSchema,
-  isSceneAvailableAtAge,
   isSharedMomentUnlocked,
   MAX_SHARED_FRIENDS,
   SHARED_GENERATIONS_PER_DAY,
@@ -78,8 +79,9 @@ async function acceptInvite(invite: InviteWithMoment, userId: string, log: Fasti
   if (guard) return { status: guard.status, error: guard.code };
 
   const candidate = await loadSharingPerson(userId);
-  if (!fitsGroup(candidate, await loadMembers(moment.id)) || !isSceneAvailableAtAge(moment.scene, candidate.age)) {
-    return { status: 422, error: "INVITE_AGE_RULE" };
+  if (!fitsGroup(candidate, await loadMembers(moment.id))) return { status: 422, error: "INVITE_AGE_RULE" };
+  if (!fitsSharedPhotoAge(candidate.age, moment.yearsOffset, moment.scene)) {
+    return { status: 422, error: "INVITE_PERIOD_AGE" };
   }
 
   const accepted = await prisma.$transaction(async (tx) => {
@@ -131,6 +133,8 @@ async function publicInviteRoutes(app: FastifyInstance) {
     const preview: InvitePreview = {
       from: displayName(invite.sharedMoment.owner),
       sceneTitle: sceneTitle(invite.sharedMoment.scene, invite.sharedMoment.owner.locale),
+      period: invite.sharedMoment.period,
+      yearsOffset: invite.sharedMoment.yearsOffset,
       status: expired ? "EXPIRED" : invite.status,
       expiresAt: invite.expiresAt.toISOString()
     };
@@ -159,10 +163,14 @@ async function memberRoutes(app: FastifyInstance) {
 
     const scene = await prisma.scene.findUnique({ where: { id: parsed.data.sceneId } });
     const age = getAge({ month: user.birthMonth, year: user.birthYear });
-    if (!scene || !scene.isActive || !isSceneAvailableAtAge(scene, age)) return fail(reply, 422, "SCENE_NOT_AVAILABLE");
+    const { period } = parsed.data;
+    const yearsOffset = scene?.isActive ? chooseSharedYearsOffset(period, age, scene) : null;
+    if (!scene || yearsOffset === null) return fail(reply, 422, "SCENE_NOT_AVAILABLE");
 
     try {
-      const moment = await prisma.sharedMoment.create({ data: { ownerId: userId, sceneId: scene.id } });
+      const moment = await prisma.sharedMoment.create({
+        data: { ownerId: userId, sceneId: scene.id, period, yearsOffset }
+      });
       return reply.code(201).send({ id: moment.id });
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
@@ -231,6 +239,9 @@ async function memberRoutes(app: FastifyInstance) {
       // so an invite never reveals whether an address has an account.
       const candidate = await loadSharingPerson(found.id);
       if (!fitsGroup(candidate, await loadMembers(moment.id))) return fail(reply, 422, "INVITE_AGE_RULE");
+      if (!fitsSharedPhotoAge(candidate.age, moment.yearsOffset, moment.scene)) {
+        return fail(reply, 422, "INVITE_PERIOD_AGE");
+      }
       invitee = found;
       toEmail = found.email;
     } else {
@@ -256,7 +267,9 @@ async function memberRoutes(app: FastifyInstance) {
       sharedInviteMessage(locale, toEmail, `${env.APP_URL}/invite?token=${encodeURIComponent(token)}`, {
         from: displayName(moment.owner),
         scene: sceneTitle(moment.scene, locale),
-        hours: env.INVITE_TTL_HOURS
+        hours: env.INVITE_TTL_HOURS,
+        period: moment.period,
+        yearsOffset: moment.yearsOffset
       }),
       request.log
     );

@@ -406,6 +406,10 @@ model SharedMoment {
   /// One shared moment per user.
   ownerId      String             @unique
   sceneId      String
+  /// Juče / Danas / Jednog dana: everyone is moved by the same number of years (same calendar year).
+  period       LifePeriod         @default(TODAY)
+  /// Years added to each person's current age (negative for YESTERDAY, 0 for TODAY).
+  yearsOffset  Int                @default(0)
   status       SharedMomentStatus @default(WAITING)
   photoAssetId String?            @unique
   createdAt    DateTime           @default(now())

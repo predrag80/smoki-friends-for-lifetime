@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { formatShortDateTime, parseInviteTarget } from "./shared";
+import { getMessages } from "./messages";
+import { formatShortDateTime, parseInviteTarget, sharedWhen } from "./shared";
 
 test("an address with @ inside is an email, anything else a username", () => {
   assert.deepEqual(parseInviteTarget(" Marko@Gmail.com "), { email: "marko@gmail.com" });
@@ -19,4 +20,11 @@ test("empty, broken emails and invalid usernames are rejected", () => {
 test("dates are shown as day, month and time", () => {
   const local = new Date(2026, 9, 15, 9, 5).toISOString();
   assert.equal(formatShortDateTime(local), "15. 10. u 09:05");
+});
+
+test("shared moments say how far back or ahead they are", () => {
+  const messages = getMessages("sr");
+  assert.equal(sharedWhen(messages, "YESTERDAY", -20), "pre 20 godina");
+  assert.equal(sharedWhen(messages, "SOMEDAY", 15), "za 15 godina");
+  assert.equal(sharedWhen(messages, "TODAY", 0), "danas");
 });

@@ -28,8 +28,10 @@ type FaceCheckAnswer = { isPhoto: boolean; faceCount: number; clear: boolean; ob
 /** Question for the likeness judge (1–10 score). */
 function likenessQuestion({ targetAge, currentAge, group }: { targetAge: number; currentAge: number; group: boolean }): string {
   const intro = group
-    ? `Image 1 is a reference photo of a person aged ${currentAge}. Image 2 is a generated group photo meant to include exactly this person. ` +
-      "Find the person in image 2 who looks most like image 1 and rate only that person: how plausible it is that they are this same individual"
+    ? `Image 1 is a reference photo of a person aged ${currentAge}. Image 2 is a generated group photo meant to include exactly this person` +
+      (targetAge === currentAge ? ". " : ` at age ${targetAge}. `) +
+      "Find the person in image 2 who looks most like image 1 and rate only that person: how plausible it is that they are this same individual" +
+      (targetAge === currentAge ? "" : " at that age")
     : currentAge === targetAge
       ? `Image 1 is a reference portrait of a person aged ${targetAge}. Image 2 is a generated photo meant to show exactly the same person at the same age. ` +
         "Be strict: compare face shape, eye shape and spacing, eyebrows, nose, mouth, ears and hairline. " +

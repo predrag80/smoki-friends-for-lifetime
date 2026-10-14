@@ -103,9 +103,17 @@ an automatically edited final "Friend for a Lifetime" film.
 - `GenerationJob` is the queue table (status + runAfter + lock) and the source for limits/cost analytics.
 - Scene copy: `SceneTranslation` per locale; missing locales fall back to Serbian.
 - Users can delete their account and all photos/generated media.
+- Ages are picked by the app, not the user (agreed 2026-10-14): a random age inside the period range and the scene's
+  age range (`getSceneAgeRange`, `chooseMomentAge`). Ranges: Juče 6–23 (at most current age − 5), Danas = current
+  age, Jednog dana current +10 to +30 (at most 85). "Napravi ponovo" keeps the age; another scene keeps it when it fits.
+- The real Smoki package is in every scene when `backend/assets/smoki-pakovanje.webp` exists
+  (`PRODUCT_REFERENCE_IMAGE`); placement per scene, shared with the group in shared photos, design always as in the
+  packshot. A missing file only turns the package off.
 - "Zajednički trenutak" (shared moment, `modules/shared`): unlocks when all three periods have a photo and the
-  user has a username (chosen at registration or on the account page). One per user: a scene from the catalog,
-  everyone at their current age, up to 3 friends invited by email or username (10 invites/day, link valid
+  user has a username (chosen at registration or on the account page). One per user: a period (Juče / Danas /
+  Jednog dana) and a scene; everyone is moved by the same number of years (`yearsOffset`, chosen at random from the
+  owner's age, so the photo is from one calendar year); for Juče each person's aged portrait is the reference. A
+  friend whose age on the photo would be impossible or outside the scene cannot join (`INVITE_PERIOD_AGE`). Up to 3 friends invited by email or username (10 invites/day, link valid
   `INVITE_TTL_HOURS`, default 48; token in the request body, page `/invite?token=`). Each acceptance queues a
   `SHARED_PHOTO` job with everyone (owner reference first, per-person likeness check, one retry); the owner may
   regenerate 3×/24 h (`GenerationJob.manual`). Age rule: adults with adults, minors with minors; adult + minor only

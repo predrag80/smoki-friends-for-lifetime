@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { checkMomentChoice } from "./rules.js";
+import { checkMomentChoice, chooseMomentAge } from "./rules.js";
 
 const schoolCrew = { minAge: 10, maxAge: 19, isActive: true };
 
@@ -37,4 +37,24 @@ test("a period that cannot show a visible difference is unavailable", () => {
     checkMomentChoice({ period: "YESTERDAY", targetAge: 6, currentAge: 10, scene: schoolCrew }),
     "PERIOD_NOT_AVAILABLE"
   );
+});
+
+test("the app picks the age inside the period and the scene", () => {
+  assert.deepEqual(chooseMomentAge({ period: "YESTERDAY", currentAge: 46, scene: schoolCrew, random: () => 0 }), { age: 10 });
+  assert.deepEqual(chooseMomentAge({ period: "YESTERDAY", currentAge: 46, scene: schoolCrew, random: () => 0.999 }), { age: 19 });
+  assert.deepEqual(chooseMomentAge({ period: "TODAY", currentAge: 16, scene: schoolCrew }), { age: 16 });
+});
+
+test("regenerating keeps the age when it still fits", () => {
+  assert.deepEqual(chooseMomentAge({ period: "YESTERDAY", currentAge: 46, scene: schoolCrew, keepAge: 15 }), { age: 15 });
+  const adultScene = { minAge: 18, maxAge: 90, isActive: true };
+  assert.deepEqual(chooseMomentAge({ period: "YESTERDAY", currentAge: 46, scene: adultScene, keepAge: 15, random: () => 0 }), {
+    age: 18
+  });
+});
+
+test("scenes that do not fit the period, and unavailable periods, are refused", () => {
+  assert.deepEqual(chooseMomentAge({ period: "SOMEDAY", currentAge: 46, scene: schoolCrew }), { error: "SCENE_NOT_AVAILABLE" });
+  assert.deepEqual(chooseMomentAge({ period: "YESTERDAY", currentAge: 10, scene: schoolCrew }), { error: "PERIOD_NOT_AVAILABLE" });
+  assert.deepEqual(chooseMomentAge({ period: "TODAY", currentAge: 30, scene: null }), { error: "SCENE_NOT_AVAILABLE" });
 });

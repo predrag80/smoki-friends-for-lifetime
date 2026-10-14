@@ -87,24 +87,56 @@ test("cheering scenes may show joy but keep the face visible; no date stamps", (
   assert.match(cheering, /No date stamp/);
 });
 
-test("the shared photo names every person with their current age and keeps the safety rules", () => {
-  const prompt = buildSharedPhotoPrompt({ scenePrompt: "a bench in a park", territory: "SOCIALIZING", ages: [36, 34, 40] });
+const pair = [
+  { currentAge: 36, targetAge: 36 },
+  { currentAge: 34, targetAge: 34 },
+  { currentAge: 40, targetAge: 40 }
+];
+
+test("the shared photo names every person with their age and keeps the safety rules", () => {
+  const prompt = buildSharedPhotoPrompt({ scenePrompt: "a bench in a park", territory: "SOCIALIZING", period: "TODAY", people: pair, now });
   assert.match(prompt, /3 people together/);
-  assert.match(prompt, /the first reference image shows person 1, aged 36/);
-  assert.match(prompt, /the third reference image shows person 3, aged 40/);
+  assert.match(prompt, /the first reference image shows person 1, who is 36/);
+  assert.match(prompt, /the third reference image shows person 3, who is 40/);
   assert.match(prompt, /Never merge, swap or average faces/);
   assert.match(prompt, /must not resemble real or famous people/);
+  assert.match(prompt, /takes place today/);
   assert.doesNotMatch(prompt, /snack package/);
 });
 
-test("the packshot comes right after the people in the shared photo", () => {
+test("a shared photo from the past uses the portraits and the era of that year", () => {
   const prompt = buildSharedPhotoPrompt({
     scenePrompt: "a bench in a park",
     territory: "SOCIALIZING",
-    ages: [16, 15],
+    period: "YESTERDAY",
+    people: [
+      { currentAge: 46, targetAge: 16 },
+      { currentAge: 44, targetAge: 14 }
+    ],
+    portraitReferences: true,
     productReference: true,
-    productPlacement: "on the bench"
+    productPlacement: "on the bench",
+    now
   });
+  assert.match(prompt, /person 1, who is 16 \(a teenager\)/);
+  assert.match(prompt, /around 1996/);
+  assert.match(prompt, /identical to its reference portrait/);
   assert.match(prompt, /The third reference image shows a snack package/);
-  assert.match(prompt, /aged 15 \(a teenager\)/);
+  assert.match(prompt, /within reach of the whole group/);
+  assert.match(prompt, /style of the photo's year/);
+});
+
+test("a shared photo in the future ages everyone from today's photos", () => {
+  const prompt = buildSharedPhotoPrompt({
+    scenePrompt: "a bench in a park",
+    territory: "SOCIALIZING",
+    period: "SOMEDAY",
+    people: [
+      { currentAge: 46, targetAge: 66 },
+      { currentAge: 40, targetAge: 60 }
+    ],
+    now
+  });
+  assert.match(prompt, /today, aged 46; in this photo they are 66 \(an older adult, 20 years older\)/);
+  assert.match(prompt, /around 2046/);
 });

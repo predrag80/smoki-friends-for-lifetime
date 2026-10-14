@@ -10,7 +10,7 @@ import { TextField } from "../components/text-field";
 import ui from "../components/ui.module.css";
 import { apiFetch, errorCode } from "../lib/api";
 import { errorMessage, format } from "../lib/messages";
-import { formatShortDateTime, parseInviteTarget } from "../lib/shared";
+import { formatShortDateTime, parseInviteTarget, sharedWhen } from "../lib/shared";
 import { SharedBuilder } from "./shared-builder";
 import styles from "./story.module.css";
 
@@ -74,6 +74,18 @@ function SharedPhoto({ moment }: { moment: SharedMomentDto }) {
           <p>{moment.error ? errorMessage(messages, moment.error) : sh.waiting}</p>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function SceneHeading({ moment }: { moment: SharedMomentDto }) {
+  const { messages } = useMessages();
+  return (
+    <div>
+      <h3 className={styles.sharedScene}>{moment.scene.title}</h3>
+      <p className={ui.hint}>
+        {messages.story.periods[moment.period]} · {sharedWhen(messages, moment.period, moment.yearsOffset)}
+      </p>
     </div>
   );
 }
@@ -157,7 +169,7 @@ function MyMoment({ moment }: { moment: SharedMomentDto }) {
     <article className={styles.sharedCard}>
       <SharedPhoto moment={moment} />
       <div className={styles.sharedBody}>
-        <h3 className={styles.sharedScene}>{moment.scene.title}</h3>
+        <SceneHeading moment={moment} />
         <People moment={moment} />
 
         {friends > 0 && !moment.pending ? (
@@ -228,7 +240,7 @@ function JoinedMoment({ moment }: { moment: SharedMomentDto }) {
     <article className={styles.sharedCard}>
       <SharedPhoto moment={moment} />
       <div className={styles.sharedBody}>
-        <h3 className={styles.sharedScene}>{moment.scene.title}</h3>
+        <SceneHeading moment={moment} />
         <p className={ui.hint}>{format(sh.by, { name: moment.owner ?? "" })}</p>
         <People moment={moment} />
         {leave.error ? <p className={ui.error}>{errorMessage(messages, leave.error)}</p> : null}
@@ -256,7 +268,13 @@ function IncomingInvites({ invites }: { invites: IncomingInvite[] }) {
       <ul className={styles.inviteList}>
         {invites.map((invite) => (
           <li key={invite.id}>
-            <span>{format(sh.incomingText, { from: invite.from, scene: invite.sceneTitle })}</span>
+            <span>
+              {format(sh.incomingText, {
+                from: invite.from,
+                scene: invite.sceneTitle,
+                when: sharedWhen(messages, invite.period, invite.yearsOffset)
+              })}
+            </span>
             <span className={styles.actions}>
               <button
                 className={ui.primary}

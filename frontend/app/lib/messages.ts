@@ -203,8 +203,9 @@ const sr = {
     momentAlt: "{period}: {scene}, {age} godina",
     builderTitle: "{period}: napravi trenutak",
     builderRegenerateTitle: "{period}: napravi ponovo",
-    ageLabel: "Koliko godina imaš na fotografiji?",
     ageFixed: "Danas imaš {age} godina.",
+    ageSurprise: "Godine na fotografiji biramo mi, u skladu sa scenom. Iznenadićemo te!",
+    ageKept: "Zadržavamo iste godine ({age}). Ako izabereš scenu koja nije za te godine, biramo nove.",
     territoryLabel: "Gde je trenutak?",
     territories: {
       RELAXING: "Trenutak za sebe",
@@ -225,8 +226,16 @@ const sr = {
     needUsername: "Za zajednički trenutak potrebno ti je korisničko ime, da bi te prijatelji prepoznali.",
     needUsernameCta: "Izaberi korisničko ime",
     start: "Napravi zajednički trenutak",
-    builderTitle: "Zajednički trenutak: izaberi scenu",
-    builderHint: "Svi na fotografiji su u svojim sadašnjim godinama.",
+    builderTitle: "Zajednički trenutak",
+    periodLabel: "Kada je trenutak?",
+    periodHints: {
+      YESTERDAY: "Svi ste mlađi za isti broj godina, kao na fotografiji iz iste godine. Koliko godina unazad biramo mi.",
+      TODAY: "Svi ste u svojim sadašnjim godinama.",
+      SOMEDAY: "Svi ste stariji za isti broj godina. Koliko godina unapred biramo mi."
+    },
+    whenPast: "pre {years} godina",
+    whenFuture: "za {years} godina",
+    whenToday: "danas",
     confirm: "Izaberi ovu scenu",
     waiting: "Pozovi prijatelje. Fotografiju pravimo čim prvi prijatelj prihvati poziv.",
     pending: "Pravimo zajedničku fotografiju…",
@@ -258,14 +267,14 @@ const sr = {
     leaveConfirm: "Da, napusti",
     leaveText: "Fotografiju sa tobom brišemo, a prijatelj dobija novu bez tebe.",
     incomingTitle: "Pozivi za tebe",
-    incomingText: "{from} te zove na zajedničku fotografiju „{scene}”.",
+    incomingText: "{from} te zove na zajedničku fotografiju „{scene}” ({when}).",
     accept: "Prihvati",
     decline: "Odbij"
   },
   invite: {
     title: "Poziv na Zajednički trenutak",
     loading: "Učitavamo poziv…",
-    text: "{from} te zove na zajedničku Smoki fotografiju u sceni „{scene}”.",
+    text: "{from} te zove na zajedničku Smoki fotografiju u sceni „{scene}” ({when}).",
     explain:
       "Kada prihvatiš, tvoja profilna fotografija se koristi da te AI smesti na zajedničku sliku. Fotografiju vide samo osobe koje su na njoj, a ti možeš da je napustiš kad god želiš.",
     validUntil: "Poziv važi do {date}.",
@@ -366,6 +375,8 @@ const sr = {
     INVITE_CLOSED: "Ovaj poziv više nije aktivan.",
     INVITE_AGE_RULE:
       "Ovaj poziv nije moguć: punoletni i maloletni korisnici mogu biti na istoj fotografiji samo ako je u pitanju roditelj ili staratelj. Možda i scena nije za sve uzraste.",
+    INVITE_PERIOD_AGE:
+      "Za ovaj trenutak to nije moguće: sa istim pomerajem u godinama osoba bi bila premlada ili prestara, ili scena nije za te godine.",
     INVITE_NEEDS_PHOTO: "Da prihvatiš poziv, prvo postavi svoju fotografiju u Mojoj priči.",
     INVITE_NEEDS_READY: "Da prihvatiš poziv, prvo završi korake na svom nalogu: potvrda email adrese i saglasnosti.",
     inviteTargetInvalid: "Unesi email adresu ili korisničko ime.",

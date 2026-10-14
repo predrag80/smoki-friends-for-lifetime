@@ -85,11 +85,16 @@ function companionsInstruction(targetAge: number): string {
   );
 }
 
-function productInstruction(placement: string | undefined, position: number): string {
+function productInstruction(placement: string | undefined, position: number, period?: LifePeriod): string {
   return (
     `The ${ORDINALS[position - 1]} reference image shows a snack package: reproduce it faithfully (shape, colours, logo and printing), never invent other packaging, ` +
     `and place it ${placement ?? "naturally in the scene"}. It is a natural part of the moment, never held up or presented to the camera ` +
-    "like an advertisement; the person looks at the others or the scene, not posing with the product."
+    "like an advertisement; the person looks at the others or the scene, not posing with the product." +
+    (period === "YESTERDAY"
+      ? " Keep the package design exactly as in the reference, lit and photographed in the style of the photo's year (it blends into the old photo)."
+      : period === "SOMEDAY"
+        ? " The same package design, as part of an ordinary everyday moment."
+        : "")
   );
 }
 
@@ -141,7 +146,7 @@ export function buildPhotoPrompt(input: PromptInput): string {
     eraInstruction(input.period, year),
     companionsInstruction(input.targetAge),
     `Mood: ${territoryMood[input.territory]}.`,
-    ...(productPosition ? [productInstruction(input.productPlacement, productPosition)] : []),
+    ...(productPosition ? [productInstruction(input.productPlacement, productPosition, input.period)] : []),
     "Other people in the scene are fictional and must not resemble real or famous people.",
     "No logos, labels or brand names on bottles, cans, drinks, food, clothing, devices or anywhere else" +
       (productReference ? " (except the snack package from the reference image)" : "") +
@@ -174,32 +179,65 @@ export function buildAgedPortraitPrompt(input: {
   ].join(" ");
 }
 
-/** "Zajednički trenutak": everyone at their current age, one reference photo per person (in this order). */
+export type SharedPerson = {
+  /** Age today (in the person's reference photo, or the portrait's age for YESTERDAY). */
+  currentAge: number;
+  /** Age on the shared photo (currentAge + years offset). */
+  targetAge: number;
+};
+
+/**
+ * "Zajednički trenutak": one reference per person, in this order. For YESTERDAY the references are portraits that
+ * already show each person at their age on the photo; for TODAY and SOMEDAY they are today's photos.
+ */
 export function buildSharedPhotoPrompt(input: {
   scenePrompt: string;
   territory: Territory;
-  /** Current age of each person, in the order of the reference images. */
-  ages: number[];
+  period: LifePeriod;
+  people: SharedPerson[];
+  /** True for YESTERDAY: the references are portraits at the target age. */
+  portraitReferences?: boolean;
   productReference?: boolean;
   productPlacement?: string;
+  now?: Date;
 }): string {
-  const count = input.ages.length;
+  const count = input.people.length;
   const productReference = input.productReference ?? false;
-  const people = input.ages
-    .map((age, index) => `the ${ORDINALS[index]} reference image shows person ${index + 1}, aged ${age} (${lifeStage(age)})`)
-    .join("; ");
+  const first = input.people[0];
+  const year = first ? momentYear(first.targetAge, first.currentAge, input.now) : new Date().getUTCFullYear();
+  const describe = (person: SharedPerson, index: number) => {
+    const intro = `the ${ORDINALS[index]} reference image shows person ${index + 1}`;
+    if (input.portraitReferences || person.targetAge === person.currentAge) {
+      return `${intro}, who is ${person.targetAge} (${lifeStage(person.targetAge)}) in this photo`;
+    }
+    return (
+      `${intro} today, aged ${person.currentAge}; in this photo they are ${person.targetAge} ` +
+      `(${lifeStage(person.targetAge)}, ${person.targetAge - person.currentAge} years older)`
+    );
+  };
+  const ageRule =
+    input.period === "SOMEDAY"
+      ? "Show everyone older with believable age-appropriate changes to skin, hair, face shape and body, while each face stays clearly recognisable."
+      : input.portraitReferences
+        ? "Each face must be identical to its reference portrait, which already shows the person at their age in this photo; only expression, lighting and angle may change."
+        : "Everyone keeps their current age as in their reference image.";
   return [
-    `Create one photorealistic, natural-looking photograph of ${count} people together: ${people}.`,
+    `Create one photorealistic, natural-looking photograph of ${count} people together: ${input.people.map(describe).join("; ")}.`,
     `All ${count} people appear exactly once, side by side as one group, each with the face from their own reference image: ` +
       "same face shape, eyes, eyebrows, nose, mouth, ears, hairline and skin tone. Never merge, swap or average faces, and never add a second copy of anyone.",
-    "Everyone keeps their current age as in their reference image.",
+    ageRule,
+    "Each person must unmistakably look their age in this photo" +
+      (input.people.some((person) => person.targetAge < 18) ? "; children and teenagers look like children and teenagers, not adults" : "") +
+      ".",
     "All of them are in the foreground and in sharp focus, faces turned towards the camera or at most a slight three-quarter angle, " +
       "eyes open and clearly visible, gentle natural smiles; nobody is cut off by the frame or hidden behind someone else.",
-    "Dress everyone in everyday clothes that fit the scene, the season and their age; do not copy the clothing or any printed text from the reference photos.",
+    "Dress everyone in everyday clothes that fit the scene, the season, their age and the year; do not copy the clothing or any printed text from the reference photos.",
     `Scene: ${input.scenePrompt}.`,
-    eraInstruction("TODAY", new Date().getUTCFullYear()),
+    eraInstruction(input.period, year),
     `Mood: ${territoryMood[input.territory]}, a real moment shared by friends.`,
-    ...(productReference ? [productInstruction(input.productPlacement, count + 1)] : []),
+    ...(productReference
+      ? [productInstruction(`${input.productPlacement ?? "in the scene"}, within reach of the whole group`, count + 1, input.period)]
+      : []),
     "If anyone else is in the scene, they are few, in the background, out of focus, fictional and must not resemble real or famous people.",
     "No logos, labels or brand names on bottles, cans, drinks, food, clothing, devices or anywhere else" +
       (productReference ? " (except the snack package from the reference image)" : "") +

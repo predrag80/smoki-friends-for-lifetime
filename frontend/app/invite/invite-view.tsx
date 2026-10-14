@@ -9,7 +9,7 @@ import { useMessages } from "../components/messages-provider";
 import ui from "../components/ui.module.css";
 import { apiFetch, ApiError, errorCode } from "../lib/api";
 import { errorMessage, format } from "../lib/messages";
-import { formatShortDateTime } from "../lib/shared";
+import { formatShortDateTime, sharedWhen } from "../lib/shared";
 
 /** Page opened from the invite email: preview, then accept or decline after signing in. */
 export function InviteView({ token }: { token: string }) {
@@ -53,7 +53,7 @@ export function InviteView({ token }: { token: string }) {
   }
   if (respond.data === "decline") return <p className={ui.notice}>{t.declined}</p>;
 
-  const { from, sceneTitle, status, expiresAt } = preview.data;
+  const { from, sceneTitle, status, expiresAt, period, yearsOffset } = preview.data;
   if (status === "EXPIRED") return <p className={ui.error}>{errorMessage(messages, "INVITE_EXPIRED")}</p>;
   if (status !== "PENDING") {
     return (
@@ -67,7 +67,7 @@ export function InviteView({ token }: { token: string }) {
   const here = `/invite?token=${encodeURIComponent(token)}`;
   return (
     <div className={ui.stack}>
-      <p>{format(t.text, { from, scene: sceneTitle })}</p>
+      <p>{format(t.text, { from, scene: sceneTitle, when: sharedWhen(messages, period, yearsOffset) })}</p>
       <p className={ui.hint}>{t.explain}</p>
       <p className={ui.hint}>{format(t.validUntil, { date: formatShortDateTime(expiresAt) })}</p>
 

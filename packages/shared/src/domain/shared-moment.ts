@@ -1,5 +1,5 @@
 import { ADULT_AGE } from "./age.js";
-import { lifePeriods } from "./life-periods.js";
+import { getSceneAgeRange, lifePeriods, MAX_SCENE_AGE, MIN_SCENE_AGE, pickRandomAge, type LifePeriod } from "./life-periods.js";
 
 /** "Zajednički trenutak": one shared photo per user with up to three invited friends. */
 export const MAX_SHARED_FRIENDS = 3;
@@ -56,4 +56,33 @@ export function canShareMoment(a: SharingPerson, b: SharingPerson): boolean {
   const adult = aAdult ? a : b;
   const minor = aAdult ? b : a;
   return minor.confirmedGuardianEmail !== null && minor.confirmedGuardianEmail === adult.email.trim().toLowerCase();
+}
+
+type SceneAges = { minAge: number; maxAge: number };
+
+/**
+ * Years everyone in a shared photo is moved by: 0 for TODAY; for YESTERDAY and SOMEDAY a random age of the owner
+ * inside the period and scene, so everyone appears as they were (or will be) in the same calendar year.
+ * Null when the scene does not fit the owner in this period.
+ */
+export function chooseSharedYearsOffset(
+  period: LifePeriod,
+  ownerAge: number,
+  scene: SceneAges,
+  random: () => number = Math.random
+): number | null {
+  const range = getSceneAgeRange(period, ownerAge, scene);
+  if (!range) return null;
+  return period === "TODAY" ? 0 : pickRandomAge(range, random) - ownerAge;
+}
+
+/** Age a person has on the shared photo. */
+export function sharedTargetAge(currentAge: number, yearsOffset: number): number {
+  return currentAge + yearsOffset;
+}
+
+/** A person fits the shared photo when their age on it is possible at all and allowed by the scene. */
+export function fitsSharedPhotoAge(currentAge: number, yearsOffset: number, scene: SceneAges): boolean {
+  const age = sharedTargetAge(currentAge, yearsOffset);
+  return age >= MIN_SCENE_AGE && age <= MAX_SCENE_AGE && age >= scene.minAge && age <= scene.maxAge;
 }

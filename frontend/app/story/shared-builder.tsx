@@ -1,6 +1,13 @@
 "use client";
 
-import { territories, type CreateSharedMomentRequest, type Territory } from "@sffl/shared";
+import {
+  getPeriodAgeRange,
+  lifePeriods,
+  territories,
+  type CreateSharedMomentRequest,
+  type LifePeriod,
+  type Territory
+} from "@sffl/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
@@ -12,7 +19,7 @@ import styles from "./story.module.css";
 
 type SceneOption = { id: string; territory: Territory; title: string; description: string };
 
-/** Dialog for picking the scene of the shared moment (everyone at their current age). */
+/** Dialog for picking the period and scene of the shared moment (everyone moved by the same number of years). */
 export function SharedBuilder({ currentAge, onClose }: { currentAge: number; onClose: () => void }) {
   const { locale, messages } = useMessages();
   const s = messages.story;
@@ -20,6 +27,8 @@ export function SharedBuilder({ currentAge, onClose }: { currentAge: number; onC
   const titleId = useId();
   const dialog = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
+  const periods = lifePeriods.filter((item) => getPeriodAgeRange(item, currentAge) !== null);
+  const [period, setPeriod] = useState<LifePeriod>("TODAY");
   const [territory, setTerritory] = useState<Territory>("SOCIALIZING");
   const [sceneId, setSceneId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,11 +41,8 @@ export function SharedBuilder({ currentAge, onClose }: { currentAge: number; onC
   }, [onClose]);
 
   const scenes = useQuery({
-    queryKey: ["scenes", "TODAY", currentAge, currentAge, locale],
-    queryFn: () =>
-      apiFetch<{ scenes: SceneOption[] }>(
-        `/scenes?period=TODAY&age=${currentAge}&currentAge=${currentAge}&locale=${locale}`
-      ),
+    queryKey: ["scenes", period, currentAge, locale],
+    queryFn: () => apiFetch<{ scenes: SceneOption[] }>(`/scenes?period=${period}&currentAge=${currentAge}&locale=${locale}`),
     staleTime: 60 * 1000
   });
   const territoryScenes = (scenes.data?.scenes ?? []).filter((scene) => scene.territory === territory);
@@ -55,7 +61,7 @@ export function SharedBuilder({ currentAge, onClose }: { currentAge: number; onC
     event.preventDefault();
     setError(null);
     if (!selectedScene) return setError("SCENE_NOT_AVAILABLE");
-    submit.mutate({ sceneId: selectedScene.id });
+    submit.mutate({ period, sceneId: selectedScene.id });
   }
 
   return (
@@ -71,7 +77,28 @@ export function SharedBuilder({ currentAge, onClose }: { currentAge: number; onC
         </div>
 
         <form className={ui.form} onSubmit={onSubmit}>
-          <p className={ui.hint}>{sh.builderHint}</p>
+          <fieldset className={ui.fieldset}>
+            <legend className={ui.label}>{sh.periodLabel}</legend>
+            <div className={styles.territories}>
+              {periods.map((item) => (
+                <label key={item} className={item === period ? `${styles.choice} ${styles.choiceActive}` : styles.choice}>
+                  <input
+                    type="radio"
+                    name="period"
+                    value={item}
+                    checked={item === period}
+                    onChange={() => {
+                      setPeriod(item);
+                      setSceneId(null);
+                    }}
+                  />
+                  {s.periods[item]}
+                </label>
+              ))}
+            </div>
+            <p className={ui.hint}>{sh.periodHints[period]}</p>
+          </fieldset>
+
           <fieldset className={ui.fieldset}>
             <legend className={ui.label}>{s.territoryLabel}</legend>
             <div className={styles.territories}>

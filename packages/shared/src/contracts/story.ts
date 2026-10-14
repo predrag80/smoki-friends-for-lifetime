@@ -39,15 +39,15 @@ export type StoryErrorCode = (typeof storyErrorCodes)[number];
 
 export const momentStatuses = ["PHOTO_PENDING", "PHOTO_READY", "VIDEO_PENDING", "VIDEO_READY", "FAILED"] as const;
 
+/** The age on the photo is picked by the server at random within the period and scene (see getSceneAgeRange). */
 export const createMomentRequestSchema = z.object({
   period: z.enum(lifePeriods),
-  targetAge: z.number().int().min(0).max(120),
   sceneId: z.string().min(1).max(64)
 });
 export type CreateMomentRequest = z.infer<typeof createMomentRequestSchema>;
 
+/** A new photo keeps the age; another scene keeps it too when it fits, otherwise a new age is picked. */
 export const regenerateMomentRequestSchema = z.object({
-  targetAge: z.number().int().min(0).max(120).optional(),
   sceneId: z.string().min(1).max(64).optional()
 });
 export type RegenerateMomentRequest = z.infer<typeof regenerateMomentRequestSchema>;

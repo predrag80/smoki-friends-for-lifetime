@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { normalizeUsername, USERNAME_MAX_LENGTH } from "../domain/shared-moment.js";
+import { lifePeriods } from "../domain/life-periods.js";
 import { territories } from "../domain/scenes.js";
 import { emailSchema } from "./auth.js";
 
@@ -10,8 +11,11 @@ export const usernameSchema = z.string().max(USERNAME_MAX_LENGTH + 5).transform(
 export const usernameUpdateRequestSchema = z.object({ username: usernameSchema });
 export type UsernameUpdateRequest = z.input<typeof usernameUpdateRequestSchema>;
 
-export const createSharedMomentRequestSchema = z.object({ sceneId: z.string().min(1).max(64) });
-export type CreateSharedMomentRequest = z.infer<typeof createSharedMomentRequestSchema>;
+export const createSharedMomentRequestSchema = z.object({
+  period: z.enum(lifePeriods).default("TODAY"),
+  sceneId: z.string().min(1).max(64)
+});
+export type CreateSharedMomentRequest = z.input<typeof createSharedMomentRequestSchema>;
 
 /** Invite by email or by username (exactly one). */
 export const inviteFriendRequestSchema = z.union([
@@ -42,6 +46,7 @@ export const sharedErrorCodes = [
   "INVITE_EXPIRED",
   "INVITE_CLOSED",
   "INVITE_AGE_RULE",
+  "INVITE_PERIOD_AGE",
   "INVITE_NEEDS_PHOTO",
   "INVITE_NEEDS_READY"
 ] as const;
@@ -69,6 +74,9 @@ export const sharedMomentDtoSchema = z.object({
   isOwner: z.boolean(),
   owner: z.string().nullable(),
   scene: sceneSchema,
+  period: z.enum(lifePeriods),
+  /** Years everyone is moved by (negative = in the past). */
+  yearsOffset: z.number(),
   status: z.enum(sharedMomentStatuses),
   pending: z.boolean(),
   photoUrl: z.string().nullable(),
@@ -85,6 +93,8 @@ export const incomingInviteSchema = z.object({
   id: z.string(),
   from: z.string(),
   sceneTitle: z.string(),
+  period: z.enum(lifePeriods),
+  yearsOffset: z.number(),
   expiresAt: z.string()
 });
 export type IncomingInvite = z.infer<typeof incomingInviteSchema>;
@@ -102,6 +112,8 @@ export type SharedSection = z.infer<typeof sharedSectionSchema>;
 export const invitePreviewSchema = z.object({
   from: z.string(),
   sceneTitle: z.string(),
+  period: z.enum(lifePeriods),
+  yearsOffset: z.number(),
   status: z.enum(inviteStatuses),
   expiresAt: z.string()
 });

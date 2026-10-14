@@ -94,8 +94,11 @@ const envSchema = z.object({
   GEMINI_IMAGE_MODEL: z.string().default("gemini-nano-banana-2.1"),
   GEMINI_CHECK_MODEL: z.string().default("gemini-2.5-flash"),
   GEMINI_IMAGE_ASPECT_RATIO: z.string().default("3:4"),
-  /** Optional packshot of the real Smoki package; sent to the image model as a second reference. */
-  PRODUCT_REFERENCE_IMAGE: z.string().optional(),
+  /**
+   * Packshot of the real Smoki package, sent to the image model so the package appears in every scene.
+   * Relative paths start in the backend folder. A missing file only turns the package off (logged once).
+   */
+  PRODUCT_REFERENCE_IMAGE: z.preprocess(emptyAsUndefined, z.string().default("assets/smoki-pakovanje.webp")),
   /** Comma-separated accounts allowed to use AI (empty = everyone). For the public dev server. */
   AI_ALLOWED_EMAILS: z.string().optional(),
   /** Photo generations per rolling 24 h for the whole server (0 = no cap). */

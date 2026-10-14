@@ -16,9 +16,15 @@ export async function loadProductReference(path: string): Promise<{ data: Buffer
 
 let cached: Promise<{ data: Buffer; mimeType: string } | undefined> | null = null;
 
-/** Product reference configured with PRODUCT_REFERENCE_IMAGE; undefined when not set. */
+/**
+ * Product reference configured with PRODUCT_REFERENCE_IMAGE; undefined when not set or when the file cannot be
+ * read (generation then continues without the package instead of failing).
+ */
 export function getProductReference(path: string | undefined): Promise<{ data: Buffer; mimeType: string } | undefined> {
   if (!path) return Promise.resolve(undefined);
-  cached ??= loadProductReference(path);
+  cached ??= loadProductReference(path).catch((error: unknown) => {
+    console.error(`Product reference ${path} could not be loaded; photos are made without the package.`, error);
+    return undefined;
+  });
   return cached;
 }

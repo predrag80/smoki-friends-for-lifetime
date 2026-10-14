@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  getPeriodAgeRange,
   territories,
   type CreateMomentRequest,
   type LifePeriod,
@@ -24,17 +23,13 @@ type SceneOption = { id: string; territory: Territory; title: string; descriptio
 
 type MomentBuilderProps = { target: BuilderTarget; currentAge: number; onClose: () => void };
 
-/** Dialog for choosing age, territory and scene, then starting the photo generation. */
+/** Dialog for choosing territory and scene (the app picks the age), then starting the photo generation. */
 export function MomentBuilder({ target, currentAge, onClose }: MomentBuilderProps) {
   const { locale, messages } = useMessages();
   const s = messages.story;
   const titleId = useId();
   const dialog = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
-  const range = getPeriodAgeRange(target.period, currentAge) ?? { min: currentAge, max: currentAge };
-  const defaultAge = target.moment?.targetAge ?? Math.round((range.min + range.max) / 2);
-
-  const [age, setAge] = useState(defaultAge);
   const [territory, setTerritory] = useState<Territory>(target.moment?.scene.territory ?? "RELAXING");
   const [sceneId, setSceneId] = useState<string | null>(target.moment?.scene.id ?? null);
   const [error, setError] = useState<string | null>(null);
@@ -47,11 +42,9 @@ export function MomentBuilder({ target, currentAge, onClose }: MomentBuilderProp
   }, [onClose]);
 
   const scenes = useQuery({
-    queryKey: ["scenes", target.period, age, currentAge, locale],
+    queryKey: ["scenes", target.period, currentAge, locale],
     queryFn: () =>
-      apiFetch<{ scenes: SceneOption[] }>(
-        `/scenes?period=${target.period}&age=${age}&currentAge=${currentAge}&locale=${locale}`
-      ),
+      apiFetch<{ scenes: SceneOption[] }>(`/scenes?period=${target.period}&currentAge=${currentAge}&locale=${locale}`),
     staleTime: 60 * 1000
   });
   const territoryScenes = (scenes.data?.scenes ?? []).filter((scene) => scene.territory === territory);
@@ -62,11 +55,11 @@ export function MomentBuilder({ target, currentAge, onClose }: MomentBuilderProp
       target.moment
         ? apiFetch(`/moments/${target.moment.id}/regenerate`, {
             method: "POST",
-            body: { targetAge: age, sceneId: sceneId ?? undefined } satisfies RegenerateMomentRequest
+            body: { sceneId: sceneId ?? undefined } satisfies RegenerateMomentRequest
           })
         : apiFetch("/moments", {
             method: "POST",
-            body: { period: target.period, targetAge: age, sceneId: sceneId ?? "" } satisfies CreateMomentRequest
+            body: { period: target.period, sceneId: sceneId ?? "" } satisfies CreateMomentRequest
           }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["story"] });
@@ -83,7 +76,11 @@ export function MomentBuilder({ target, currentAge, onClose }: MomentBuilderProp
   }
 
   const periodLabel = s.periods[target.period];
-  const fixedAge = range.min === range.max;
+  const ageNote = target.moment
+    ? format(s.ageKept, { age: target.moment.targetAge })
+    : target.period === "TODAY"
+      ? format(s.ageFixed, { age: currentAge })
+      : s.ageSurprise;
 
   return (
     <div className={styles.backdrop} onClick={(event) => event.target === event.currentTarget && onClose()}>
@@ -105,33 +102,7 @@ export function MomentBuilder({ target, currentAge, onClose }: MomentBuilderProp
         </div>
 
         <form className={ui.form} onSubmit={onSubmit}>
-          <fieldset className={ui.fieldset}>
-            <legend className={ui.label}>{s.ageLabel}</legend>
-            {fixedAge ? (
-              <p className={ui.hint}>{format(s.ageFixed, { age })}</p>
-            ) : (
-              <div className={styles.ageControl}>
-                <output className={styles.ageValue} htmlFor="age-slider">
-                  {age}
-                  <span>{s.ageUnit}</span>
-                </output>
-                <input
-                  id="age-slider"
-                  className={styles.slider}
-                  type="range"
-                  min={range.min}
-                  max={range.max}
-                  step={1}
-                  value={age}
-                  onChange={(event) => setAge(Number(event.target.value))}
-                />
-                <div className={styles.sliderScale} aria-hidden="true">
-                  <span>{range.min}</span>
-                  <span>{range.max}</span>
-                </div>
-              </div>
-            )}
-          </fieldset>
+          <p className={ui.hint}>{ageNote}</p>
 
           <fieldset className={ui.fieldset}>
             <legend className={ui.label}>{s.territoryLabel}</legend>

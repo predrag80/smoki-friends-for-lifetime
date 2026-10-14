@@ -10,6 +10,8 @@ const earlier = new Date("2026-10-12T12:00:00Z");
 const row: SharedRow = {
   id: "s1",
   ownerId: "u1",
+  period: "TODAY",
+  yearsOffset: 0,
   status: "PHOTO_READY",
   photoAssetId: "a1",
   scene: { id: "movie-night", territory: "RELAXING", translations: [{ locale: "sr", title: "Filmsko veče" }] },

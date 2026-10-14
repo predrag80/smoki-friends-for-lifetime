@@ -5,6 +5,7 @@ import {
   MAX_SHARED_FRIENDS,
   SHARED_GENERATIONS_PER_DAY,
   type AppLocale,
+  type LifePeriod,
   type SharedMomentDto,
   type SharingPerson,
   type Territory
@@ -17,6 +18,8 @@ type Person = { id: string; username: string | null; email: string };
 export type SharedRow = {
   id: string;
   ownerId: string;
+  period: LifePeriod;
+  yearsOffset: number;
   status: SharedMomentDto["status"];
   photoAssetId: string | null;
   scene: { id: string; territory: Territory; translations: { locale: AppLocale; title: string }[] };
@@ -83,6 +86,8 @@ export function toSharedMomentDto(
     isOwner,
     owner: displayName(row.owner),
     scene: { id: row.scene.id, title: sceneTitle(row.scene, options.locale), territory: row.scene.territory },
+    period: row.period,
+    yearsOffset: row.yearsOffset,
     status: row.status,
     pending,
     photoUrl: row.photoAssetId ? mediaUrl(options.apiUrl, row.photoAssetId) : null,

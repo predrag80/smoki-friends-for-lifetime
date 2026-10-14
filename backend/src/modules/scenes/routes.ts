@@ -7,8 +7,8 @@ import { toSceneDtos } from "./service.js";
 
 const scenesQuerySchema = z.object({
   period: z.enum(lifePeriods),
-  /** Target age chosen on the slider. */
-  age: z.coerce.number().int().min(0).max(120),
+  /** Optional target age; without it, every scene that fits some age of the period is listed. */
+  age: z.coerce.number().int().min(0).max(120).optional(),
   /** User's current age; used to validate that the target age fits the period. */
   currentAge: z.coerce.number().int().min(0).max(120),
   locale: z.enum(appLocales).default(defaultLocale)
@@ -17,7 +17,7 @@ const scenesQuerySchema = z.object({
 export async function sceneRoutes(app: FastifyInstance) {
   /**
    * Scenes that make sense for the selected life period and age.
-   * Example: GET /scenes?period=YESTERDAY&age=12&currentAge=36&locale=sr
+   * Example: GET /scenes?period=YESTERDAY&currentAge=36&locale=sr (or with &age=12 for one age)
    */
   app.get("/scenes", async (request, reply) => {
     const parsed = scenesQuerySchema.safeParse(request.query);
@@ -33,12 +33,17 @@ export async function sceneRoutes(app: FastifyInstance) {
       return reply.code(422).send({ error: "PERIOD_NOT_AVAILABLE", period, currentAge });
     }
 
-    if (age < range.min || age > range.max) {
+    if (age !== undefined && (age < range.min || age > range.max)) {
       return reply.code(422).send({ error: "AGE_OUT_OF_PERIOD_RANGE", period, range });
     }
 
+    // With an age: scenes for that age. Without: scenes whose age range overlaps the period (the app picks the age).
     const rows = await prisma.scene.findMany({
-      where: { isActive: true, minAge: { lte: age }, maxAge: { gte: age } },
+      where: {
+        isActive: true,
+        minAge: { lte: age ?? range.max },
+        maxAge: { gte: age ?? range.min }
+      },
       include: { translations: { where: { locale: { in: [locale, defaultLocale] } } } }
     });
 

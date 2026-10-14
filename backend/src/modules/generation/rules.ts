@@ -1,4 +1,4 @@
-import { getPeriodAgeRange, type LifePeriod } from "@sffl/shared";
+import { getPeriodAgeRange, getSceneAgeRange, pickRandomAge, type LifePeriod } from "@sffl/shared";
 
 export type MomentChoice = {
   period: LifePeriod;
@@ -23,4 +23,23 @@ export function checkMomentChoice(choice: MomentChoice): MomentChoiceError | nul
     return "SCENE_NOT_AVAILABLE";
   }
   return null;
+}
+
+/**
+ * Age shown on a moment's photo: kept when it still fits the period and scene (regenerate), otherwise a random
+ * age inside both ranges. The user no longer picks the age (agreed 2026-10-14).
+ */
+export function chooseMomentAge(input: {
+  period: LifePeriod;
+  currentAge: number;
+  scene: { minAge: number; maxAge: number; isActive: boolean } | null;
+  keepAge?: number;
+  random?: () => number;
+}): { age: number } | { error: MomentChoiceError } {
+  if (!getPeriodAgeRange(input.period, input.currentAge)) return { error: "PERIOD_NOT_AVAILABLE" };
+  if (!input.scene || !input.scene.isActive) return { error: "SCENE_NOT_AVAILABLE" };
+  const range = getSceneAgeRange(input.period, input.currentAge, input.scene);
+  if (!range) return { error: "SCENE_NOT_AVAILABLE" };
+  if (input.keepAge !== undefined && input.keepAge >= range.min && input.keepAge <= range.max) return { age: input.keepAge };
+  return { age: pickRandomAge(range, input.random) };
 }

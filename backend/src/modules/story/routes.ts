@@ -21,7 +21,7 @@ import { isEmailAllowed, parseAllowedEmails } from "../generation/guard.js";
 import { countRecentPhotoJobs } from "../generation/jobs.js";
 import { getAiProvider, ProviderError } from "../generation/providers/index.js";
 import type { FaceCheckResult } from "../generation/providers/types.js";
-import { checkMomentChoice } from "../generation/rules.js";
+import { chooseMomentAge } from "../generation/rules.js";
 import { loadSharedSection } from "../shared/data.js";
 import { mediaUrl, sortMoments, toMomentDto } from "./service.js";
 
@@ -177,19 +177,19 @@ export async function storyRoutes(app: FastifyInstance) {
     ]);
     if (!photo) return fail(reply, 409, "NO_SOURCE_PHOTO");
 
-    const choiceError = checkMomentChoice({
-      ...parsed.data,
+    const choice = chooseMomentAge({
+      period: parsed.data.period,
       currentAge: getAge({ month: user.birthMonth, year: user.birthYear }),
       scene
     });
-    if (choiceError) return fail(reply, 422, choiceError);
+    if ("error" in choice) return fail(reply, 422, choice.error);
 
     try {
       const moment = await prisma.moment.create({
         data: {
           userId,
           period: parsed.data.period,
-          targetAge: parsed.data.targetAge,
+          targetAge: choice.age,
           sceneId: parsed.data.sceneId,
           sourcePhotoId: photo.id,
           status: "PHOTO_PENDING",
@@ -232,7 +232,6 @@ export async function storyRoutes(app: FastifyInstance) {
     const guard = await aiGuard(userId, { checkCap: true });
     if (guard) return fail(reply, guard.status, guard.code);
 
-    const targetAge = parsed.data.targetAge ?? moment.targetAge;
     const sceneId = parsed.data.sceneId ?? moment.sceneId;
     const [user, photo, scene] = await Promise.all([
       loadUser(userId),
@@ -241,13 +240,15 @@ export async function storyRoutes(app: FastifyInstance) {
     ]);
     if (!photo) return fail(reply, 409, "NO_SOURCE_PHOTO");
 
-    const choiceError = checkMomentChoice({
+    // The age stays the same (same younger/older self); only a scene that does not allow it gets a new age.
+    const choice = chooseMomentAge({
       period: moment.period,
-      targetAge,
       currentAge: getAge({ month: user.birthMonth, year: user.birthYear }),
-      scene
+      scene,
+      keepAge: moment.targetAge
     });
-    if (choiceError) return fail(reply, 422, choiceError);
+    if ("error" in choice) return fail(reply, 422, choice.error);
+    const targetAge = choice.age;
 
     await prisma.moment.update({
       where: { id: moment.id },

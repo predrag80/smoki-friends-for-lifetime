@@ -127,6 +127,8 @@ export async function loadSharedSection(
         id: invite.id,
         from: displayName(invite.sharedMoment.owner),
         sceneTitle: sceneTitle(invite.sharedMoment.scene, viewer.locale),
+        period: invite.sharedMoment.period,
+        yearsOffset: invite.sharedMoment.yearsOffset,
         expiresAt: invite.expiresAt.toISOString()
       }))
   };

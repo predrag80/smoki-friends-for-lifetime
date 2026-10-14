@@ -1,4 +1,4 @@
-import type { AppLocale } from "@sffl/shared";
+import type { AppLocale, LifePeriod } from "@sffl/shared";
 
 import type { MailMessage } from "../../lib/mailer.js";
 import { pickCopy, renderEmail, type LocalizedCopy } from "../auth/emails.js";
@@ -9,7 +9,7 @@ const inviteCopy: LocalizedCopy = {
     subject: "{from} te zove na zajedničku fotografiju",
     heading: "Poziv na Zajednički trenutak",
     body:
-      "{from} pravi zajedničku Smoki fotografiju u sceni „{scene}” i želi da budeš na njoj. " +
+      "{from} pravi zajedničku Smoki fotografiju u sceni „{scene}”{when} i želi da budeš na njoj. " +
       "Kad prihvatiš poziv, tvoja profilna fotografija se koristi da te AI smesti na tu sliku. Link važi {hours} sati.",
     cta: "Pogledaj poziv",
     footer: "Ako ne poznaješ pošiljaoca, slobodno ignoriši ovu poruku. Bez tvog prihvatanja nećeš biti na fotografiji."
@@ -40,14 +40,26 @@ function fill(template: string, values: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (match, key: string) => values[key] ?? match);
 }
 
+/** ", pre 20 godina" / ", za 15 godina" / "" (Serbian; used in the invite text). */
+export function sharedWhen(period: LifePeriod, yearsOffset: number): string {
+  if (period === "YESTERDAY") return `, kakvi ste bili pre ${-yearsOffset} godina`;
+  if (period === "SOMEDAY") return `, kakvi ćete biti za ${yearsOffset} godina`;
+  return "";
+}
+
 export function sharedInviteMessage(
   locale: AppLocale,
   to: string,
   link: string,
-  values: { from: string; scene: string; hours: number }
+  values: { from: string; scene: string; hours: number; period: LifePeriod; yearsOffset: number }
 ): MailMessage {
   const copy = pickCopy(inviteCopy, locale);
-  const strings = { from: values.from, scene: values.scene, hours: String(values.hours) };
+  const strings = {
+    from: values.from,
+    scene: values.scene,
+    hours: String(values.hours),
+    when: sharedWhen(values.period, values.yearsOffset)
+  };
   return { to, subject: fill(copy.subject, strings), ...renderEmail(copy, link, fill(copy.body, strings)) };
 }
 

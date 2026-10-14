@@ -3,16 +3,20 @@ import { test } from "node:test";
 
 import {
   getPeriodAgeRange,
+  getSceneAgeRange,
   isAgeInPeriod,
+  pickRandomAge,
   MAX_SCENE_AGE,
   MIN_SCENE_AGE
 } from "./life-periods.js";
 import { filterScenesByAge, sceneCatalog, territories } from "./scenes.js";
 
 test("period age ranges follow the agreed rules", () => {
-  assert.deepEqual(getPeriodAgeRange("YESTERDAY", 36), { min: MIN_SCENE_AGE, max: 31 });
+  assert.deepEqual(getPeriodAgeRange("YESTERDAY", 46), { min: MIN_SCENE_AGE, max: 23 });
+  assert.deepEqual(getPeriodAgeRange("YESTERDAY", 20), { min: MIN_SCENE_AGE, max: 15 });
   assert.deepEqual(getPeriodAgeRange("TODAY", 36), { min: 36, max: 36 });
-  assert.deepEqual(getPeriodAgeRange("SOMEDAY", 36), { min: 46, max: MAX_SCENE_AGE });
+  assert.deepEqual(getPeriodAgeRange("SOMEDAY", 36), { min: 46, max: 66 });
+  assert.deepEqual(getPeriodAgeRange("SOMEDAY", 70), { min: 80, max: MAX_SCENE_AGE });
 });
 
 test("periods that cannot show a visible difference are unavailable", () => {
@@ -22,9 +26,18 @@ test("periods that cannot show a visible difference are unavailable", () => {
 
 test("target age must be an integer inside the period range", () => {
   assert.equal(isAgeInPeriod("YESTERDAY", 36, 12), true);
-  assert.equal(isAgeInPeriod("YESTERDAY", 36, 33), false);
+  assert.equal(isAgeInPeriod("YESTERDAY", 36, 24), false);
   assert.equal(isAgeInPeriod("TODAY", 36, 37), false);
   assert.equal(isAgeInPeriod("SOMEDAY", 36, 70.5), false);
+});
+
+test("scene and period ranges are intersected, and random ages stay inside", () => {
+  assert.deepEqual(getSceneAgeRange("YESTERDAY", 46, { minAge: 10, maxAge: 19 }), { min: 10, max: 19 });
+  assert.deepEqual(getSceneAgeRange("YESTERDAY", 46, { minAge: 18, maxAge: 90 }), { min: 18, max: 23 });
+  assert.equal(getSceneAgeRange("SOMEDAY", 46, { minAge: 10, maxAge: 19 }), null);
+  assert.equal(pickRandomAge({ min: 10, max: 19 }, () => 0), 10);
+  assert.equal(pickRandomAge({ min: 10, max: 19 }, () => 0.9999), 19);
+  assert.equal(pickRandomAge({ min: 36, max: 36 }, () => 0.5), 36);
 });
 
 test("catalog has 15 scenes, five per territory, with unique ids", () => {

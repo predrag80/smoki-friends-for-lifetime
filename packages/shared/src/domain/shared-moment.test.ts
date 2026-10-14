@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { canShareMoment, checkUsername, isSharedMomentUnlocked, normalizeUsername } from "./shared-moment.js";
+import {
+  canShareMoment,
+  checkUsername,
+  chooseSharedYearsOffset,
+  fitsSharedPhotoAge,
+  isSharedMomentUnlocked,
+  normalizeUsername,
+  sharedTargetAge
+} from "./shared-moment.js";
 
 test("usernames are normalised and validated", () => {
   assert.equal(normalizeUsername("  @Marko.Petrovic "), "marko.petrovic");
@@ -34,4 +42,22 @@ test("an adult and a minor only when the adult is the confirmed guardian", () =>
   assert.equal(canShareMoment(child, { ...adult, email: " Mama@Example.com " }), true);
   assert.equal(canShareMoment(otherAdult, child), false);
   assert.equal(canShareMoment(adult, otherChild), false);
+});
+
+test("a shared moment moves everyone by the same number of years", () => {
+  const anyScene = { minAge: 6, maxAge: 90 };
+  assert.equal(chooseSharedYearsOffset("TODAY", 46, anyScene), 0);
+  assert.equal(chooseSharedYearsOffset("YESTERDAY", 46, anyScene, () => 0), -40);
+  assert.equal(chooseSharedYearsOffset("YESTERDAY", 46, { minAge: 10, maxAge: 19 }, () => 0.999), -27);
+  assert.equal(chooseSharedYearsOffset("SOMEDAY", 46, anyScene, () => 0), 10);
+  assert.equal(chooseSharedYearsOffset("SOMEDAY", 46, { minAge: 10, maxAge: 19 }), null);
+  assert.equal(sharedTargetAge(40, -25), 15);
+});
+
+test("a friend who would be too young, too old or outside the scene cannot join", () => {
+  const anyScene = { minAge: 6, maxAge: 90 };
+  assert.equal(fitsSharedPhotoAge(30, -20, anyScene), true);
+  assert.equal(fitsSharedPhotoAge(25, -20, anyScene), false);
+  assert.equal(fitsSharedPhotoAge(80, 10, anyScene), false);
+  assert.equal(fitsSharedPhotoAge(30, -20, { minAge: 12, maxAge: 90 }), false);
 });
