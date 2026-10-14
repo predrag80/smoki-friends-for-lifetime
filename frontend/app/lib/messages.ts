@@ -162,6 +162,11 @@ const sr = {
     guardianStep: "Saglasnost roditelja",
     guardianPending: "Čekamo potvrdu sa adrese {email}.",
     guardianDone: "Roditelj ili staratelj je dao saglasnost.",
+    guardianEmailFix: "Pogrešan email roditelja? Ispravi",
+    guardianEmailNew: "Ispravan email roditelja ili staratelja",
+    guardianEmailHint: "Na ovu adresu šaljemo novi link, a stari prestaje da važi.",
+    guardianEmailSend: "Pošalji na novu adresu",
+    guardianEmailSaved: "Poslali smo novi link na ispravljenu adresu.",
     photoStep: "Saglasnost za obradu fotografije",
     photoText:
       "Tvoju fotografiju koristimo samo da bismo napravili tvoje AI fotografije i filmove. Fotografija je privatna i možeš da je obrišeš kad god želiš.",

@@ -11,6 +11,7 @@ import ui from "../components/ui.module.css";
 import { apiFetch, ApiError, errorCode } from "../lib/api";
 import { errorMessage, format } from "../lib/messages";
 import styles from "./account-view.module.css";
+import { GuardianEmailForm } from "./guardian-email-form";
 import { ParentLinkForm } from "./parent-link-form";
 import { UsernameForm } from "./username-form";
 
@@ -154,6 +155,7 @@ export function AccountView() {
                   >
                     {sent === "guardian" ? a.sent : a.resend}
                   </button>
+                  <GuardianEmailForm />
                 </div>
               )}
             </Step>
