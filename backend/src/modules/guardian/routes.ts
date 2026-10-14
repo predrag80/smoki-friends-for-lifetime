@@ -1,4 +1,4 @@
-import { guardianConfirmRequestSchema, maskEmail, tokenRequestSchema } from "@sffl/shared";
+import { getAge, guardianConfirmRequestSchema, maskEmail, requiresGuardianConsent, tokenRequestSchema } from "@sffl/shared";
 import type { FastifyInstance } from "fastify";
 
 import { hashToken } from "../../lib/crypto.js";
@@ -15,12 +15,19 @@ export async function guardianRoutes(app: FastifyInstance) {
 
     const consent = await prisma.guardianConsent.findUnique({
       where: { tokenHash: hashToken(parsed.data.token) },
-      select: { confirmedAt: true, expiresAt: true, user: { select: { email: true, deletedAt: true } } }
+      select: {
+        confirmedAt: true,
+        expiresAt: true,
+        user: { select: { email: true, deletedAt: true, birthMonth: true, birthYear: true, market: true } }
+      }
     });
     if (!consent || consent.user.deletedAt) return reply.code(404).send({ error: "INVALID_TOKEN" });
 
     return reply.send({
       childEmail: maskEmail(consent.user.email),
+      purpose: requiresGuardianConsent(getAge({ month: consent.user.birthMonth, year: consent.user.birthYear }), consent.user.market)
+        ? "CONSENT"
+        : "PARENT_LINK",
       status: consent.confirmedAt ? "CONFIRMED" : "PENDING",
       expired: !consent.confirmedAt && consent.expiresAt.getTime() <= Date.now()
     });

@@ -66,6 +66,10 @@ export const guardianConfirmRequestSchema = tokenRequestSchema.extend({ accept: 
 
 export const guardianResendRequestSchema = z.object({ guardianEmail: emailSchema.optional() });
 
+/** Teenagers above the consent age may name a parent, so they can share photos with them. */
+export const parentLinkRequestSchema = z.object({ parentEmail: emailSchema });
+export type ParentLinkRequest = z.input<typeof parentLinkRequestSchema>;
+
 export const consentUpdateRequestSchema = z.object({
   type: z.enum(userManagedConsentTypes),
   granted: z.boolean()
@@ -99,6 +103,15 @@ export const meResponseSchema = z.object({
     /** Masked guardian email, e.g. "m*****@gmail.com". */
     email: z.string().nullable()
   }),
+  /**
+   * Optional parent for shared photos (minors above the consent age). `available` is false for everyone else;
+   * minors below the consent age already have their guardian from the required consent.
+   */
+  parentLink: z.object({
+    available: z.boolean(),
+    status: z.enum(["NONE", "PENDING", "CONFIRMED"]),
+    email: z.string().nullable()
+  }),
   readiness: z.object({
     canCreate: z.boolean(),
     missing: z.array(z.enum(readinessSteps))
@@ -116,6 +129,8 @@ export type OAuthSignupInfoResponse = z.infer<typeof oauthSignupInfoResponseSche
 
 export const guardianLookupResponseSchema = z.object({
   childEmail: z.string(),
+  /** CONSENT: required consent for a young child; PARENT_LINK: a teenager names their parent for shared photos. */
+  purpose: z.enum(["CONSENT", "PARENT_LINK"]),
   status: z.enum(["PENDING", "CONFIRMED"]),
   expired: z.boolean()
 });
@@ -129,6 +144,7 @@ export const authErrorCodes = [
   "UNDER_MIN_AGE",
   "GUARDIAN_EMAIL_REQUIRED",
   "GUARDIAN_EMAIL_SAME_AS_USER",
+  "PARENT_LINK_NOT_AVAILABLE",
   "EMAIL_TAKEN",
   "INVALID_CREDENTIALS",
   "UNAUTHENTICATED",

@@ -206,6 +206,9 @@ function MyMoment({ moment }: { moment: SharedMomentDto }) {
                     {invite.status === "EXPIRED"
                       ? sh.inviteExpired
                       : format(sh.inviteExpires, { date: formatShortDateTime(invite.expiresAt) })}
+                    {invite.problem ? (
+                      <span className={ui.fieldError}> · {sh.inviteProblems[invite.problem] ?? errorMessage(messages, invite.problem)}</span>
+                    ) : null}
                   </span>
                   <button className={ui.ghost} type="button" disabled={cancel.isPending} onClick={() => cancel.mutate(invite.id)}>
                     {sh.cancelInvite}

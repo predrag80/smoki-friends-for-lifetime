@@ -11,6 +11,7 @@ import ui from "../components/ui.module.css";
 import { apiFetch, ApiError, errorCode } from "../lib/api";
 import { errorMessage, format } from "../lib/messages";
 import styles from "./account-view.module.css";
+import { ParentLinkForm } from "./parent-link-form";
 import { UsernameForm } from "./username-form";
 
 type StepProps = { title: string; done: boolean; children: React.ReactNode };
@@ -175,6 +176,8 @@ export function AccountView() {
       </section>
 
       <UsernameForm current={user.username} />
+
+      {me.data.parentLink.available ? <ParentLinkForm link={me.data.parentLink} /> : null}
 
       <section>
         <h2 className={styles.sectionTitle}>{a.profileTitle}</h2>

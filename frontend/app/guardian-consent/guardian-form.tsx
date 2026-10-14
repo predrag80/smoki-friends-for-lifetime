@@ -33,7 +33,10 @@ export function GuardianConsentForm({ token }: { token: string }) {
     return <p className={ui.error}>{errorMessage(messages, token ? errorCode(lookup.error) : "INVALID_TOKEN")}</p>;
   }
   if (!lookup.data) return <p className={ui.hint}>{g.loading}</p>;
-  if (lookup.data.status === "CONFIRMED" || confirm.isSuccess) return <p className={ui.notice}>{g.confirmed}</p>;
+  const parent = lookup.data.purpose === "PARENT_LINK";
+  if (lookup.data.status === "CONFIRMED" || confirm.isSuccess) {
+    return <p className={ui.notice}>{parent ? g.parentConfirmedText : g.confirmed}</p>;
+  }
   if (lookup.data.expired) return <p className={ui.error}>{errorMessage(messages, "TOKEN_EXPIRED")}</p>;
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -45,15 +48,16 @@ export function GuardianConsentForm({ token }: { token: string }) {
 
   return (
     <form className={ui.form} onSubmit={onSubmit} noValidate>
-      <p>{format(g.intro, { child: lookup.data.childEmail })}</p>
+      {parent ? <h2 className={styles.subtitle}>{g.parentTitle}</h2> : null}
+      <p>{format(parent ? g.parentIntro : g.intro, { child: lookup.data.childEmail })}</p>
       <ul className={styles.points}>
-        {g.explain.map((point) => (
+        {(parent ? g.parentExplain : g.explain).map((point) => (
           <li key={point}>{point}</li>
         ))}
       </ul>
       <label className={ui.check}>
         <input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} />
-        <span>{g.accept}</span>
+        <span>{parent ? g.parentAccept : g.accept}</span>
       </label>
       {error ? (
         <p className={ui.error} role="alert">
@@ -61,7 +65,7 @@ export function GuardianConsentForm({ token }: { token: string }) {
         </p>
       ) : null}
       <button className={ui.primary} type="submit" disabled={confirm.isPending}>
-        {confirm.isPending ? g.submitting : g.submit}
+        {confirm.isPending ? g.submitting : parent ? g.parentSubmit : g.submit}
       </button>
     </form>
   );

@@ -1,9 +1,12 @@
 import {
+  canLinkParent,
   canOfferMarketing,
   checkUsername,
   consentUpdateRequestSchema,
   getAge,
   guardianResendRequestSchema,
+  maskEmail,
+  parentLinkRequestSchema,
   requiresGuardianConsent,
   usernameUpdateRequestSchema
 } from "@sffl/shared";
@@ -11,7 +14,14 @@ import type { FastifyInstance } from "fastify";
 
 import { getEnv } from "../../config/env.js";
 import { prisma } from "../../lib/prisma.js";
-import { isUsernameConflict, isUsernameUsed, rotateGuardianToken, sendGuardianEmail } from "../auth/accounts.js";
+import {
+  isUsernameConflict,
+  isUsernameUsed,
+  linkParent,
+  rotateGuardianToken,
+  sendGuardianEmail,
+  sendParentLinkEmail
+} from "../auth/accounts.js";
 import { loadMe } from "../auth/load-me.js";
 import { getUserId, requireUser } from "../auth/require-user.js";
 import { clearSessionCookie, getRequestMeta } from "../auth/session.js";
@@ -97,6 +107,42 @@ export async function meRoutes(app: FastifyInstance) {
       return reply.code(202).send(await loadMe(user.id));
     }
   );
+
+  /** A teenager above the consent age names a parent for shared photos; the parent confirms by email. */
+  app.post("/me/parent-link", { config: { rateLimit: { max: 3, timeWindow: "10 minutes" } } }, async (request, reply) => {
+    const parsed = parentLinkRequestSchema.safeParse(request.body);
+    if (!parsed.success) return reply.code(400).send({ error: "INVALID_BODY", issues: parsed.error.issues });
+
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: getUserId(request) },
+      select: { id: true, email: true, username: true, locale: true, birthMonth: true, birthYear: true, market: true }
+    });
+    if (!canLinkParent(getAge({ month: user.birthMonth, year: user.birthYear }), user.market)) {
+      return reply.code(409).send({ error: "PARENT_LINK_NOT_AVAILABLE" });
+    }
+    const { parentEmail } = parsed.data;
+    if (parentEmail === user.email) return reply.code(422).send({ error: "GUARDIAN_EMAIL_SAME_AS_USER" });
+
+    const token = await linkParent(user.id, parentEmail);
+    await sendParentLinkEmail(
+      { parentEmail, child: user.username ? `@${user.username}` : maskEmail(user.email), locale: user.locale, token },
+      request.log
+    );
+    return reply.code(202).send(await loadMe(user.id));
+  });
+
+  /** Removes the parent a teenager named (not the consent that younger children need). */
+  app.delete("/me/parent-link", async (request, reply) => {
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: getUserId(request) },
+      select: { id: true, birthMonth: true, birthYear: true, market: true }
+    });
+    if (!canLinkParent(getAge({ month: user.birthMonth, year: user.birthYear }), user.market)) {
+      return reply.code(409).send({ error: "PARENT_LINK_NOT_AVAILABLE" });
+    }
+    await prisma.guardianConsent.deleteMany({ where: { userId: user.id } });
+    return reply.send(await loadMe(user.id));
+  });
 
   /**
    * Deletes the account: personal data is removed or anonymised immediately and all sessions end.

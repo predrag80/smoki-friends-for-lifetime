@@ -5,7 +5,13 @@ import { getEnv } from "../../config/env.js";
 import { generateToken, hashToken } from "../../lib/crypto.js";
 import { sendMail } from "../../lib/mailer.js";
 import { prisma } from "../../lib/prisma.js";
-import { guardianConsentMessage, passwordChangedMessage, passwordResetMessage, verifyEmailMessage } from "./emails.js";
+import {
+  guardianConsentMessage,
+  parentLinkMessage,
+  passwordChangedMessage,
+  passwordResetMessage,
+  verifyEmailMessage
+} from "./emails.js";
 import type { RequestMeta } from "./session.js";
 
 type Logger = { info: (obj: object, msg?: string) => void; error: (obj: object, msg?: string) => void };
@@ -188,6 +194,33 @@ export async function sendGuardianEmail(
     guardianConsentMessage(input.locale, input.guardianEmail, link, maskEmail(input.childEmail)),
     logger
   );
+}
+
+/**
+ * A teenager above the consent age names a parent (optional, for shared photos). Any earlier link is replaced and
+ * must be confirmed again by the parent.
+ */
+export async function linkParent(userId: string, parentEmail: string): Promise<string> {
+  const token = generateToken();
+  const data = {
+    guardianEmail: parentEmail,
+    tokenHash: hashToken(token),
+    expiresAt: new Date(Date.now() + getEnv().GUARDIAN_CONSENT_TTL_DAYS * DAY_MS),
+    sentAt: new Date(),
+    confirmedAt: null,
+    confirmedIp: null,
+    confirmedUserAgent: null
+  };
+  await prisma.guardianConsent.upsert({ where: { userId }, create: { userId, ...data }, update: data });
+  return token;
+}
+
+export async function sendParentLinkEmail(
+  input: { parentEmail: string; child: string; locale: AppLocale; token: string },
+  logger: Logger
+): Promise<void> {
+  const link = `${getEnv().APP_URL}/guardian-consent?token=${encodeURIComponent(input.token)}`;
+  await sendMail(parentLinkMessage(input.locale, input.parentEmail, link, input.child), logger);
 }
 
 /** New link for the guardian (optionally to a corrected address); the old link stops working. */

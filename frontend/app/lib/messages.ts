@@ -123,7 +123,17 @@ const sr = {
     submit: "Dajem saglasnost",
     submitting: "Čuvamo…",
     confirmed: "Hvala. Saglasnost je zabeležena i korisnik može da nastavi.",
-    loading: "Učitavamo…"
+    loading: "Učitavamo…",
+    parentTitle: "Potvrda roditelja",
+    parentIntro: "Korisnik {child} vas je označio kao roditelja ili staratelja.",
+    parentExplain: [
+      "Kada potvrdite, vi i vaše dete možete da budete zajedno na zajedničkim Smoki fotografijama.",
+      "Za to vam je potreban nalog u aplikaciji sa ovom email adresom.",
+      "Bez potvrde, dete može na zajedničke fotografije samo sa vršnjacima. Potvrdu dete može da ukloni u bilo kom trenutku."
+    ],
+    parentAccept: "Ja sam roditelj ili staratelj ovog korisnika.",
+    parentSubmit: "Potvrđujem",
+    parentConfirmedText: "Hvala. Sada možete zajedno na zajedničke Smoki fotografije."
   },
   account: {
     title: "Moj nalog",
@@ -134,6 +144,15 @@ const sr = {
     usernameMissing: "Izaberi korisničko ime da bi mogao da pozoveš prijatelje na zajedničku fotografiju i da oni mogu da pozovu tebe.",
     usernameSave: "Sačuvaj korisničko ime",
     usernameSaved: "Korisničko ime je sačuvano.",
+    parentTitle: "Roditelj za zajedničke fotografije",
+    parentText:
+      "Ako želiš da budeš na zajedničkoj Smoki fotografiji sa mamom, tatom ili starateljem, upiši email koji on/ona koristi u aplikaciji. Roditelj dobija email i potvrđuje. Bez toga možeš na zajedničke fotografije samo sa vršnjacima.",
+    parentEmail: "Email roditelja ili staratelja",
+    parentSend: "Pošalji zahtev roditelju",
+    parentPending: "Čekamo potvrdu sa adrese {email}.",
+    parentConfirmed: "Roditelj ({email}) je potvrdio. Možete zajedno na Smoki fotografije.",
+    parentChange: "Promeni roditelja",
+    parentRemove: "Ukloni",
     saving: "Čuvamo…",
     done: "Gotovo",
     waiting: "Čeka",
@@ -249,6 +268,10 @@ const sr = {
     inviteExpires: "važi do {date}",
     inviteExpired: "istekao",
     cancelInvite: "Povuci",
+    inviteProblems: {
+      INVITE_PERIOD_AGE: "ne može da prihvati: godine na slici ne odgovaraju periodu ili sceni",
+      INVITE_AGE_RULE: "ne može da prihvati: punoletni i maloletni mogu zajedno samo uz potvrđenog roditelja"
+    } as Record<string, string>,
     inviteLabel: "Pozovi prijatelja",
     inviteHint: "Email adresa ili korisničko ime (npr. @marko). Prijatelj dobija link na email.",
     inviteSend: "Pošalji poziv",
@@ -318,6 +341,7 @@ const sr = {
     UNDER_MIN_AGE: "Aplikacija je dostupna od 12 godina.",
     GUARDIAN_EMAIL_REQUIRED: "Unesi email roditelja ili staratelja.",
     GUARDIAN_EMAIL_SAME_AS_USER: "Email roditelja mora da bude drugačiji od tvog.",
+    PARENT_LINK_NOT_AVAILABLE: "Označavanje roditelja nije dostupno za tvoje godine.",
     EMAIL_TAKEN: "Nalog sa ovom email adresom već postoji. Prijavi se.",
     usernameRequired: "Izaberi korisničko ime.",
     USERNAME_INVALID: "Korisničko ime može da ima 3–20 znakova: mala slova a–z, brojeve, tačku i donju crtu, bez razmaka.",
@@ -377,7 +401,7 @@ const sr = {
     INVITE_AGE_RULE:
       "Ovaj poziv nije moguć: punoletni i maloletni korisnici mogu biti na istoj fotografiji samo ako je u pitanju roditelj ili staratelj. Možda i scena nije za sve uzraste.",
     INVITE_PERIOD_AGE:
-      "Za ovaj trenutak to nije moguće: sa istim pomerajem u godinama osoba bi bila premlada ili prestara, ili scena nije za te godine.",
+      "Na ovoj fotografiji bi bio/la premlad/a ili prestar/a za izabrani period i scenu. Zamoli osobu koja te je pozvala da napravi trenutak za Danas ili Jednog dana, ili sa drugom scenom.",
     INVITE_NEEDS_PHOTO: "Da prihvatiš poziv, prvo postavi svoju fotografiju u Mojoj priči.",
     INVITE_NEEDS_READY: "Da prihvatiš poziv, prvo završi korake na svom nalogu: potvrda email adrese i saglasnosti.",
     inviteTargetInvalid: "Unesi email adresu ili korisničko ime.",

@@ -46,6 +46,14 @@ export function requiresGuardianConsent(age: number, market: MarketCode): boolea
   return age < digitalConsentAgeByMarket[market];
 }
 
+/**
+ * Minors who no longer need a guardian's consent (e.g. 15–17 in Serbia) may name a parent themselves, so they can
+ * be on shared photos with that parent (agreed 2026-10-14, option b). The parent confirms by email.
+ */
+export function canLinkParent(age: number, market: MarketCode): boolean {
+  return age < ADULT_AGE && !requiresGuardianConsent(age, market);
+}
+
 export function canOfferMarketing(age: number): boolean {
   return age >= ADULT_AGE;
 }

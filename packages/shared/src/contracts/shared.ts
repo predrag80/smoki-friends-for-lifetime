@@ -66,7 +66,9 @@ export const sharedInviteSchema = z.object({
   /** "@username" or a masked email such as "m*****@gmail.com". */
   label: z.string(),
   status: z.enum(inviteStatuses),
-  expiresAt: z.string()
+  expiresAt: z.string(),
+  /** Error code when the friend tried to accept but could not (e.g. INVITE_PERIOD_AGE). */
+  problem: z.string().nullable()
 });
 
 export const sharedMomentDtoSchema = z.object({

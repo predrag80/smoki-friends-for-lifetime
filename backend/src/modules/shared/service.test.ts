@@ -18,9 +18,9 @@ const row: SharedRow = {
   owner: { id: "u1", username: "marko", email: "marko@example.com" },
   participants: [{ user: { id: "u2", username: null, email: "ana@example.com" } }],
   invites: [
-    { id: "i1", channel: "USERNAME", email: null, status: "PENDING", expiresAt: later, invitee: { username: "jovan" } },
-    { id: "i2", channel: "EMAIL", email: "petar@example.com", status: "PENDING", expiresAt: earlier, invitee: null },
-    { id: "i3", channel: "EMAIL", email: null, status: "ACCEPTED", expiresAt: later, invitee: null }
+    { id: "i1", channel: "USERNAME", email: null, status: "PENDING", expiresAt: later, problem: null, invitee: { username: "jovan" } },
+    { id: "i2", channel: "EMAIL", email: "petar@example.com", status: "PENDING", expiresAt: earlier, problem: "INVITE_PERIOD_AGE", invitee: null },
+    { id: "i3", channel: "EMAIL", email: null, status: "ACCEPTED", expiresAt: later, problem: null, invitee: null }
   ],
   latestJob: { status: "SUCCEEDED", errorCode: null },
   manualJobs: 1
@@ -52,10 +52,10 @@ test("the owner sees invites, slots and generations left", () => {
     ]
   );
   assert.deepEqual(
-    dto.invites.map((invite) => [invite.label, invite.status]),
+    dto.invites.map((invite) => [invite.label, invite.status, invite.problem]),
     [
-      ["@jovan", "PENDING"],
-      ["p****@example.com", "EXPIRED"]
+      ["@jovan", "PENDING", null],
+      ["p****@example.com", "EXPIRED", "INVITE_PERIOD_AGE"]
     ]
   );
   assert.equal(dto.slotsLeft, 1);

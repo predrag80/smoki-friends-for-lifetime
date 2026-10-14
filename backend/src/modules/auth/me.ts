@@ -1,4 +1,5 @@
 import {
+  canLinkParent,
   getAccountReadiness,
   getAge,
   maskEmail,
@@ -56,6 +57,7 @@ export function buildMeResponse(user: MeSource, now: Date = new Date()): MeRespo
       status: guardianRequired ? (guardianConfirmed ? "CONFIRMED" : "PENDING") : "NOT_REQUIRED",
       email: guardianRequired && user.guardianConsent ? maskEmail(user.guardianConsent.guardianEmail) : null
     },
+    parentLink: parentLinkInfo(age, user),
     readiness: getAccountReadiness({
       emailVerified,
       guardianRequired,
@@ -63,4 +65,11 @@ export function buildMeResponse(user: MeSource, now: Date = new Date()): MeRespo
       photoConsent: active.has("PHOTO_PROCESSING")
     })
   };
+}
+
+function parentLinkInfo(age: number, user: MeSource): MeResponse["parentLink"] {
+  if (!canLinkParent(age, user.market)) return { available: false, status: "NONE", email: null };
+  const link = user.guardianConsent;
+  if (!link) return { available: true, status: "NONE", email: null };
+  return { available: true, status: link.confirmedAt ? "CONFIRMED" : "PENDING", email: maskEmail(link.guardianEmail) };
 }

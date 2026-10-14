@@ -5,3 +5,8 @@
   padding-left: 1.25rem;
   color: var(--ink-soft);
 }
+
+.subtitle {
+  margin: 0;
+  font-size: 1.25rem;
+}

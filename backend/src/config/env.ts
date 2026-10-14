@@ -48,6 +48,8 @@ const envSchema = z.object({
   SMTP_USER: optionalString,
   SMTP_PASS: optionalString,
   MAIL_FROM: z.string().default("Smoki Friend for a Lifetime <no-reply@smoki.local>"),
+  /** Public URL of the official Smoki logo for email headers (PNG); empty = text wordmark. Read by auth/emails.ts. */
+  EMAIL_LOGO_URL: optionalString,
 
   // Token lifetimes
   EMAIL_VERIFICATION_TTL_HOURS: z.coerce.number().int().positive().default(48),

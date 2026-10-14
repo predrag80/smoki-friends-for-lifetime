@@ -31,6 +31,7 @@ export type SharedRow = {
     email: string | null;
     status: SharedMomentDto["invites"][number]["status"];
     expiresAt: Date;
+    problem: string | null;
     invitee: { username: string | null } | null;
   }[];
   latestJob: { status: string; errorCode: string | null } | null;
@@ -112,7 +113,8 @@ export function toSharedMomentDto(
                   ? maskEmail(invite.email)
                   : "—",
             status: invite.expiresAt > now ? ("PENDING" as const) : ("EXPIRED" as const),
-            expiresAt: invite.expiresAt.toISOString()
+            expiresAt: invite.expiresAt.toISOString(),
+            problem: invite.problem
           }))
       : [],
     slotsLeft: isOwner ? slotsLeft(row.participants.length, open.length) : 0,

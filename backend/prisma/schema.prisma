@@ -446,6 +446,8 @@ model SharedInvite {
   inviteeUserId  String?
   tokenHash      String        @unique
   status         InviteStatus  @default(PENDING)
+  /// Why the friend could not accept (e.g. INVITE_PERIOD_AGE); shown to the owner next to the invite.
+  problem        String?
   expiresAt      DateTime
   createdAt      DateTime      @default(now())
   respondedAt    DateTime?

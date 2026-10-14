@@ -53,3 +53,13 @@ test("a ready adult Google user", () => {
   assert.deepEqual(me.user.providers, ["GOOGLE"]);
   assert.deepEqual(me.readiness, { canCreate: true, missing: [] });
 });
+
+test("a teenager above the consent age may name a parent; others may not", () => {
+  const teen = buildMeResponse({ ...minor, birthYear: 2010, guardianConsent: null }, now);
+  assert.deepEqual(teen.parentLink, { available: true, status: "NONE", email: null });
+  const linked = buildMeResponse({ ...minor, birthYear: 2010, guardianConsent: { guardianEmail: "mama@example.com", confirmedAt: now } }, now);
+  assert.deepEqual(linked.parentLink, { available: true, status: "CONFIRMED", email: "m***@example.com" });
+  assert.equal(linked.readiness.missing.includes("GUARDIAN_CONSENT"), false);
+  assert.equal(buildMeResponse(minor, now).parentLink.available, false);
+  assert.equal(buildMeResponse({ ...minor, birthYear: 1990 }, now).parentLink.available, false);
+});

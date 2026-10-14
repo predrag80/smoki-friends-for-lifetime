@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import { getAccountReadiness, maskEmail } from "./account.js";
 import {
+  canLinkParent,
   canOfferMarketing,
   digitalConsentAgeByMarket,
   getAge,
@@ -66,4 +67,12 @@ test("readiness lists every missing step", () => {
 test("emails shown to a guardian are masked", () => {
   assert.equal(maskEmail("predrag@gmail.com"), "p******@gmail.com");
   assert.equal(maskEmail("ab@x.rs"), "a***@x.rs");
+});
+
+test("only teenagers above the consent age can name a parent themselves", () => {
+  assert.equal(canLinkParent(16, "SRB"), true);
+  assert.equal(canLinkParent(15, "SRB"), true);
+  assert.equal(canLinkParent(14, "SRB"), false);
+  assert.equal(canLinkParent(15, "HRV"), false);
+  assert.equal(canLinkParent(18, "SRB"), false);
 });

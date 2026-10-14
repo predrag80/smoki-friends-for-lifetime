@@ -79,9 +79,15 @@ async function acceptInvite(invite: InviteWithMoment, userId: string, log: Fasti
   if (guard) return { status: guard.status, error: guard.code };
 
   const candidate = await loadSharingPerson(userId);
-  if (!fitsGroup(candidate, await loadMembers(moment.id))) return { status: 422, error: "INVITE_AGE_RULE" };
-  if (!fitsSharedPhotoAge(candidate.age, moment.yearsOffset, moment.scene)) {
-    return { status: 422, error: "INVITE_PERIOD_AGE" };
+  // The friend cannot fix these; the owner sees the reason next to the invite.
+  const ageProblem = !fitsGroup(candidate, await loadMembers(moment.id))
+    ? "INVITE_AGE_RULE"
+    : !fitsSharedPhotoAge(candidate.age, moment.yearsOffset, moment.scene)
+      ? "INVITE_PERIOD_AGE"
+      : null;
+  if (ageProblem) {
+    await prisma.sharedInvite.update({ where: { id: invite.id }, data: { problem: ageProblem } });
+    return { status: 422, error: ageProblem };
   }
 
   const accepted = await prisma.$transaction(async (tx) => {

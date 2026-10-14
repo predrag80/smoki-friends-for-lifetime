@@ -60,12 +60,14 @@ export function sharedInviteMessage(
     hours: String(values.hours),
     when: sharedWhen(values.period, values.yearsOffset)
   };
-  return { to, subject: fill(copy.subject, strings), ...renderEmail(copy, link, fill(copy.body, strings)) };
+  const subject = fill(copy.subject, strings);
+  return { to, subject, ...renderEmail({ ...copy, subject }, link, fill(copy.body, strings)) };
 }
 
 export function inviteAcceptedMessage(locale: AppLocale, to: string, link: string, friend: string): MailMessage {
   const copy = pickCopy(acceptedCopy, locale);
-  return { to, subject: fill(copy.subject, { friend }), ...renderEmail(copy, link, fill(copy.body, { friend })) };
+  const subject = fill(copy.subject, { friend });
+  return { to, subject, ...renderEmail({ ...copy, subject }, link, fill(copy.body, { friend })) };
 }
 
 export function sharedPhotoReadyMessage(locale: AppLocale, to: string, link: string, scene: string): MailMessage {
