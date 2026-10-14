@@ -116,6 +116,8 @@ export async function meRoutes(app: FastifyInstance) {
         where: { id: userId },
         data: {
           email: `deleted-${userId}@deleted.invalid`,
+          // Frees the username right away (the row itself is purged later by the worker).
+          username: null,
           passwordHash: null,
           emailVerifiedAt: null,
           deletedAt: now
