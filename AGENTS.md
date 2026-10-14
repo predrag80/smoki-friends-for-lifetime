@@ -106,7 +106,8 @@ an automatically edited final "Friend for a Lifetime" film.
 - Parent link (option b, 2026-10-14): minors above the consent age (e.g. 15–17 in Serbia) may name a parent on
   "Moj nalog" (`POST/DELETE /me/parent-link`); it reuses `GuardianConsent` (no migration) and the parent confirms on
   `/guardian-consent` (copy depends on `purpose`). A confirmed parent with that email may share photos with them.
-- Emails share one branded layout (`renderEmail`): Smoki wordmark (or the official logo via `EMAIL_LOGO_URL`),
+- Emails share one branded layout (`renderEmail`): the official Smoki logo (`frontend/public/email/smoki-logo.png`,
+  default `APP_URL/email/smoki-logo.png`, override with `EMAIL_LOGO_URL`),
   "Friend for a Lifetime", button plus plain-link fallback, campaign and "automatic message" footer.
 - Ages are picked by the app, not the user (agreed 2026-10-14): a random age inside the period range and the scene's
   age range (`getSceneAgeRange`, `chooseMomentAge`). Ranges: Juče 6–23 (at most current age − 5), Danas = current

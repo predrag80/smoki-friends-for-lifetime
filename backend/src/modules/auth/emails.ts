@@ -87,16 +87,15 @@ export function escapeHtml(value: string): string {
 export type EmailBrand = {
   /** Link to the app (header logo and footer). */
   appUrl: string;
-  /** Public URL of the official Smoki logo (PNG); without it the header shows the Smoki wordmark in text. */
+  /** Public URL of the official Smoki logo (PNG, 480 px wide, shown at 160 px); without it a text wordmark is shown. */
   logoUrl?: string;
 };
 
 /** Read straight from process.env so emails can be rendered in tests without a full configuration. */
 function defaultBrand(): EmailBrand {
-  return {
-    appUrl: (process.env.APP_URL ?? "http://app.smoki.local").replace(/\/$/, ""),
-    logoUrl: process.env.EMAIL_LOGO_URL || undefined
-  };
+  const appUrl = (process.env.APP_URL ?? "http://app.smoki.local").replace(/\/$/, "");
+  // The official logo is served by the frontend (frontend/public/email/smoki-logo.png); EMAIL_LOGO_URL overrides it.
+  return { appUrl, logoUrl: process.env.EMAIL_LOGO_URL || `${appUrl}/email/smoki-logo.png` };
 }
 
 const CAMPAIGN = "Kampanja traje od 1. januara do 31. marta 2027.";
@@ -132,7 +131,7 @@ export function renderEmail(
   ].join("\n");
 
   const logo = brand.logoUrl
-    ? `<img src="${escapeHtml(brand.logoUrl)}" width="160" alt="Smoki" style="display:block;border:0;width:160px;max-width:160px;height:auto;margin:0 auto;">`
+    ? `<img src="${escapeHtml(brand.logoUrl)}" width="160" height="69" alt="Smoki" style="display:block;border:0;width:160px;max-width:160px;height:auto;margin:0 auto;">`
     : `<span style="font-family:'Arial Black',Arial,Helvetica,sans-serif;font-size:44px;line-height:1;font-weight:900;font-style:italic;letter-spacing:-1px;color:#ffffff;text-shadow:2px 2px 0 #7a1115;">Smoki</span>`;
 
   const html = `<!doctype html>

@@ -32,16 +32,16 @@ test("password reset email states how long the link is valid", () => {
   assert.ok(message.text.includes("http://app/reset-password?token=x"));
 });
 
-test("every email carries the Smoki brand, the title and a plain-link fallback", () => {
+test("every email carries the Smoki logo, the title and a plain-link fallback", () => {
   const message = verifyEmailMessage("sr", "a@example.com", "http://app/verify?token=x");
-  assert.ok(message.html.includes(">Smoki</span>"));
+  assert.ok(/<img src="[^"]*\/email\/smoki-logo\.png"/.test(message.html));
   assert.ok(message.html.includes("Friend for a Lifetime"));
   assert.ok(message.html.includes("Ako dugme ne radi"));
   assert.ok(message.html.includes('lang="sr"'));
   assert.ok(message.text.includes("31. marta 2027"));
 });
 
-test("the official logo is used when configured", () => {
+test("a configured logo URL is used, and the text wordmark only without one", () => {
   const { html } = renderEmail(
     { subject: "s", heading: "h", body: "b", cta: "c", footer: "f" },
     "http://app/x",
@@ -56,4 +56,11 @@ test("the parent link email names the teenager", () => {
   const message = parentLinkMessage("sr", "mama@example.com", "http://app/guardian-consent?token=1", "@mladi");
   assert.equal(message.subject, "Potvrdite da ste roditelj");
   assert.ok(message.text.includes("Korisnik @mladi vas je"));
+});
+
+test("without a logo URL the header falls back to the text wordmark", () => {
+  const { html } = renderEmail({ subject: "s", heading: "h", body: "b", cta: "c", footer: "f" }, "http://app/x", "b", {
+    appUrl: "https://app.example"
+  });
+  assert.ok(html.includes(">Smoki</span>"));
 });
