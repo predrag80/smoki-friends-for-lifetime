@@ -53,25 +53,36 @@ function ConfirmAction(props: { label: string; confirmLabel: string; text: strin
   );
 }
 
+/**
+ * The owner sees the generation progress; friends only see finished photos (the previous photo stays while a new
+ * version is made, or a calm note before the first one).
+ */
 function SharedPhoto({ moment }: { moment: SharedMomentDto }) {
   const { messages } = useMessages();
   const sh = messages.shared;
+  const showProgress = moment.isOwner && moment.pending;
   return (
     <div className={styles.sharedPhoto}>
       {moment.photoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element -- private image served by the API with cookies
         <img className={styles.momentImage} src={moment.photoUrl} alt={format(sh.photoAlt, { scene: moment.scene.title })} />
       ) : null}
-      {moment.pending ? (
+      {showProgress ? (
         <div className={styles.sharedOverlay} role="status">
           <span className={styles.pulse} aria-hidden="true" />
           <p>{sh.pending}</p>
           <p className={styles.frameNote}>{sh.pendingHint}</p>
         </div>
       ) : null}
-      {!moment.pending && !moment.photoUrl ? (
+      {!showProgress && !moment.photoUrl ? (
         <div className={styles.sharedOverlay}>
-          <p>{moment.error ? errorMessage(messages, moment.error) : sh.waiting}</p>
+          <p>
+            {moment.isOwner
+              ? moment.error
+                ? errorMessage(messages, moment.error)
+                : sh.waiting
+              : sh.friendComing}
+          </p>
         </div>
       ) : null}
     </div>

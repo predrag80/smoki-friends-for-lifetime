@@ -240,6 +240,7 @@ const sr = {
     waiting: "Pozovi prijatelje. Fotografiju pravimo čim prvi prijatelj prihvati poziv.",
     pending: "Pravimo zajedničku fotografiju…",
     pendingHint: "Može potrajati do minut. Možeš da zatvoriš stranicu.",
+    friendComing: "Fotografija stiže uskoro. Javićemo ti emailom kad bude gotova.",
     photoAlt: "Zajednički trenutak: {scene}",
     people: "Na fotografiji",
     owner: "pokreće",
